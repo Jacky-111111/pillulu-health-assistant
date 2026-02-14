@@ -1,0 +1,389 @@
+/* Pillulu Health Assistant - Elderly-friendly design */
+/* Color palette: #bee9e8, #62b6cb, #1b4965, #cae9ff, #5fa8d3 */
+
+:root {
+  --bg-light: #bee9e8;
+  --bg-alt: #cae9ff;
+  --primary: #1b4965;
+  --secondary: #62b6cb;
+  --accent: #5fa8d3;
+  --card-border: #62b6cb;
+  --text: #1b4965;
+  --text-muted: #2c5f7a;
+  --white: #ffffff;
+  --error: #c0392b;
+  --success: #27ae60;
+  --font-size-base: 18px;
+  --font-size-lg: 22px;
+  --font-size-xl: 26px;
+  --spacing: 1.25rem;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(27, 73, 101, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: var(--text);
+  background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-alt) 100%);
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  background: var(--primary);
+  color: var(--white);
+  padding: 1.5rem 2rem;
+  text-align: center;
+}
+
+.logo {
+  font-size: var(--font-size-xl);
+  margin: 0 0 0.25rem 0;
+  font-weight: 700;
+}
+
+.tagline {
+  margin: 0;
+  font-size: var(--font-size-base);
+  opacity: 0.95;
+}
+
+/* Disclaimer */
+.disclaimer-banner {
+  background: #fff3cd;
+  color: #856404;
+  padding: 1rem 2rem;
+  text-align: center;
+  font-size: var(--font-size-base);
+  border-bottom: 2px solid #ffc107;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Main */
+.main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.section {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 2px solid var(--card-border);
+  box-shadow: var(--shadow);
+}
+
+.section h2 {
+  margin: 0 0 1rem 0;
+  font-size: var(--font-size-lg);
+  color: var(--primary);
+}
+
+.section-desc {
+  color: var(--text-muted);
+  margin: -0.5rem 0 1rem 0;
+  font-size: 1rem;
+}
+
+/* Buttons - Large, high contrast for elderly */
+.btn {
+  padding: 0.75rem 1.5rem;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--white);
+}
+
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+}
+
+/* Inputs - Large, readable */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="time"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: var(--font-size-base);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(27, 73, 101, 0.2);
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  font-size: var(--font-size-base);
+}
+
+/* Search */
+.search-box {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.search-box input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.results-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.med-card {
+  background: var(--bg-alt);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.med-card h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: var(--font-size-base);
+  color: var(--primary);
+}
+
+.med-card p {
+  margin: 0.25rem 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.med-card .card-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* AI */
+.ai-form textarea {
+  min-height: 100px;
+}
+
+.ai-answer {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  border-left: 4px solid var(--secondary);
+}
+
+.answer-disclaimer {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Pillbox */
+.pillbox-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pillbox-card {
+  background: var(--bg-alt);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.pillbox-card h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: var(--font-size-base);
+  color: var(--primary);
+}
+
+.stock-info {
+  font-size: var(--font-size-base);
+  margin: 0.5rem 0;
+}
+
+.stock-info.low {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.schedule-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.schedule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 1rem;
+}
+
+.schedule-item .schedule-time {
+  font-weight: 600;
+}
+
+.pillbox-card .card-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-base);
+}
+
+/* Email */
+.email-form {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.email-form label {
+  flex: 0 0 auto;
+}
+
+.email-form input {
+  flex: 1;
+  min-width: 200px;
+  margin-bottom: 0;
+}
+
+/* Modals */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 2px solid var(--primary);
+}
+
+.modal-content h3 {
+  margin: 0 0 1.5rem 0;
+  color: var(--primary);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions .btn {
+  flex: 1;
+}
+
+/* Banners */
+.error-banner,
+.success-banner {
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin-top: 1rem;
+  font-size: var(--font-size-base);
+}
+
+.error-banner {
+  background: #fde8e8;
+  color: var(--error);
+  border: 2px solid var(--error);
+}
+
+.success-banner {
+  background: #e8f8f0;
+  color: var(--success);
+  border: 2px solid var(--success);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .main {
+    padding: 1rem;
+  }
+
+  .section {
+    padding: 1.25rem;
+  }
+
+  .search-box {
+    flex-direction: column;
+  }
+
+  .email-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pillulu Health Assistant - My Pillbox</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header + Disclaimer -->
+  <header class="header">
+    <h1 class="logo">💊 Pillulu Health Assistant</h1>
+    <p class="tagline">Manage your medications and take them on time</p>
+  </header>
+
+  <div class="disclaimer-banner">
+    <strong>⚠️ Important:</strong> This app is for educational purposes only and does not provide medical advice. Always consult a doctor or pharmacist before making medication decisions.
+  </div>
+
+  <main class="main">
+    <!-- 1. Search Medications -->
+    <section class="section" id="search-section">
+      <h2>🔍 Search Medications</h2>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Enter medication name, e.g. ibuprofen, amoxicillin" maxlength="100" aria-label="Search medications">
+        <button type="button" id="search-btn" class="btn btn-primary">Search</button>
+      </div>
+      <div id="search-results" class="results-grid"></div>
+      <div id="search-error" class="error-banner hidden"></div>
+    </section>
+
+    <!-- 2. Ask AI -->
+    <section class="section" id="ai-section">
+      <h2>🤖 Ask AI</h2>
+      <p class="section-desc">Ask about medication info, dosage, etc. (For reference only—consult your doctor)</p>
+      <div class="ai-form">
+        <label for="ai-question">Your question:</label>
+        <textarea id="ai-question" rows="3" placeholder="e.g. What is the typical adult dosage for ibuprofen?" maxlength="2000" aria-label="Enter question"></textarea>
+        <label for="ai-med-context">Related medication (optional):</label>
+        <input type="text" id="ai-med-context" placeholder="Medication name" maxlength="255" aria-label="Related medication">
+        <button type="button" id="ai-ask-btn" class="btn btn-primary">Ask</button>
+      </div>
+      <div id="ai-answer" class="ai-answer hidden">
+        <div class="answer-content"></div>
+        <div class="answer-disclaimer"></div>
+      </div>
+      <div id="ai-error" class="error-banner hidden"></div>
+    </section>
+
+    <!-- 3. My Pillbox -->
+    <section class="section" id="pillbox-section">
+      <h2>📦 My Pillbox</h2>
+      <div id="pillbox-list" class="pillbox-list"></div>
+      <div id="pillbox-empty" class="empty-state hidden">No medications yet. Search and add some.</div>
+      <div id="pillbox-error" class="error-banner hidden"></div>
+    </section>
+
+    <!-- 4. Email Settings -->
+    <section class="section" id="email-section">
+      <h2>📧 Email Settings</h2>
+      <p class="section-desc">Set your email to receive reminders for when to take meds and low stock alerts</p>
+      <div class="email-form">
+        <label for="user-email">Email address:</label>
+        <input type="email" id="user-email" placeholder="your@email.com" aria-label="Email address">
+        <button type="button" id="save-email-btn" class="btn btn-secondary">Save</button>
+      </div>
+      <div id="email-success" class="success-banner hidden">Email saved</div>
+      <div id="email-error" class="error-banner hidden"></div>
+    </section>
+  </main>
+
+  <!-- Modal for Add to Pillbox -->
+  <div id="add-med-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add to Pillbox</h3>
+      <form id="add-med-form">
+        <label for="add-med-name">Medication name *</label>
+        <input type="text" id="add-med-name" required>
+        <label for="add-med-purpose">Purpose (optional)</label>
+        <input type="text" id="add-med-purpose" placeholder="e.g. pain relief, fever reducer">
+        <label for="add-med-stock">Current stock</label>
+        <input type="number" id="add-med-stock" min="0" value="10">
+        <label for="add-med-threshold">Low stock alert threshold</label>
+        <input type="number" id="add-med-threshold" min="0" value="5">
+        <label for="add-med-notes">Notes (optional)</label>
+        <textarea id="add-med-notes" rows="2"></textarea>
+        <div class="modal-actions">
+          <button type="button" id="add-med-cancel" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Edit Med -->
+  <div id="edit-med-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Edit Medication</h3>
+      <form id="edit-med-form">
+        <input type="hidden" id="edit-med-id">
+        <label for="edit-med-name">Medication name *</label>
+        <input type="text" id="edit-med-name" required>
+        <label for="edit-med-purpose">Purpose (optional)</label>
+        <input type="text" id="edit-med-purpose">
+        <label for="edit-med-stock">Current stock</label>
+        <input type="number" id="edit-med-stock" min="0">
+        <label for="edit-med-threshold">Low stock alert threshold</label>
+        <input type="number" id="edit-med-threshold" min="0">
+        <label for="edit-med-notes">Notes (optional)</label>
+        <textarea id="edit-med-notes" rows="2"></textarea>
+        <div class="modal-actions">
+          <button type="button" id="edit-med-cancel" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Add Schedule -->
+  <div id="add-schedule-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add Reminder Time</h3>
+      <form id="add-schedule-form">
+        <input type="hidden" id="add-schedule-med-id">
+        <label for="add-schedule-time">Time (24-hour)</label>
+        <input type="time" id="add-schedule-time" value="08:00" required>
+        <label for="add-schedule-timezone">Timezone</label>
+        <select id="add-schedule-timezone">
+          <option value="America/New_York">US Eastern (America/New_York)</option>
+          <option value="America/Los_Angeles">US Pacific (America/Los_Angeles)</option>
+          <option value="Europe/London">UK (Europe/London)</option>
+          <option value="Asia/Shanghai">China (Asia/Shanghai)</option>
+        </select>
+        <label for="add-schedule-days">Days (daily or mon,tue,wed,etc.)</label>
+        <input type="text" id="add-schedule-days" value="daily" placeholder="daily or mon,tue,wed,thu,fri,sat,sun">
+        <div class="modal-actions">
+          <button type="button" id="add-schedule-cancel" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
