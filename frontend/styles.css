@@ -334,24 +334,59 @@ label {
   font-size: 0.9rem;
 }
 
-/* Email */
-.email-form {
+/* Notifications */
+.notifications-header {
   display: flex;
   gap: 0.5rem;
-  align-items: flex-end;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
 }
 
-.email-form label {
-  flex: 0 0 auto;
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.email-form input {
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--white);
+}
+
+.notification-item.unread {
+  background: #f0f7ff;
+  border-color: var(--primary);
+}
+
+.notification-item.read {
+  opacity: 0.85;
+}
+
+.notification-content {
   flex: 1;
-  min-width: 140px;
-  margin-bottom: 0;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
+  min-width: 0;
+}
+
+.notification-content strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.notification-content p {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.notification-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 /* Modals */
@@ -393,6 +428,41 @@ label {
 
 .modal-actions .btn {
   flex: 1;
+}
+
+/* Days checkboxes */
+.days-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.day-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.day-check input {
+  width: auto;
+  margin: 0;
+}
+
+.next-reminder-preview {
+  padding: 0.75rem 1rem;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.next-reminder-preview strong {
+  color: var(--primary);
 }
 
 /* Banners */

@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Med, Schedule, User
+from app.models import Med, Schedule
 from app.config import CRON_SECRET
-from app.services.email import send_time_to_take_reminder, send_low_stock_reminder
+from app.services.notification import create_time_to_take_notification, create_low_stock_notification
 
 router = APIRouter(prefix="/api/cron", tags=["cron"])
 
@@ -34,7 +34,7 @@ async def send_reminders(
     db: Session = Depends(get_db),
 ):
     """
-    Check due schedules and low stock, send emails.
+    Check due schedules and low stock, create in-app notifications.
     Requires X-CRON-SECRET header or body { "secret": "..." }.
     """
     body = {}
@@ -45,11 +45,6 @@ async def send_reminders(
     secret = body.get("secret") or request.headers.get("X-CRON-SECRET")
     verify_cron_secret(secret)
 
-    user = db.query(User).first()
-    if not user or not user.email:
-        return {"sent": 0, "message": "No user email configured"}
-
-    today_date = date.today()
     today_date = date.today()
     sent_count = 0
 
@@ -64,15 +59,15 @@ async def send_reminders(
             if today_weekday not in days:
                 continue
         # Dedupe: don't send if we already sent in last 3 minutes
-        if s.last_reminder_sent_at and (now - s.last_reminder_sent_at).total_seconds() < 180:
+        if s.last_reminder_sent_at and (now_tz - s.last_reminder_sent_at).total_seconds() < 180:
             continue
 
-        if send_time_to_take_reminder(user.email, s.med.name, s.time_of_day):
-            s.last_reminder_sent_at = now
-            sent_count += 1
-            # Decrement stock on reminder (MVP assumption)
-            if s.med.stock_count > 0:
-                s.med.stock_count -= 1
+        create_time_to_take_notification(db, s.med.name, s.time_of_day)
+        s.last_reminder_sent_at = now_tz
+        sent_count += 1
+        # Decrement stock on reminder (MVP assumption)
+        if s.med.stock_count > 0:
+            s.med.stock_count -= 1
 
     db.commit()
 
@@ -81,9 +76,9 @@ async def send_reminders(
     for med in meds_low:
         if med.last_low_stock_sent_at == today_date:
             continue
-        if send_low_stock_reminder(user.email, med.name, med.stock_count, med.low_stock_threshold):
-            med.last_low_stock_sent_at = today_date
-            sent_count += 1
+        create_low_stock_notification(db, med.name, med.stock_count, med.low_stock_threshold)
+        med.last_low_stock_sent_at = today_date
+        sent_count += 1
 
     db.commit()
 

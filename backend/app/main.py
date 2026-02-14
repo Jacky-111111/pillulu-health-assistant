@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import med_search, ai, pillbox, cron
+from app.routers import med_search, ai, pillbox, cron, notifications
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ app.add_middleware(
 app.include_router(med_search.router)
 app.include_router(ai.router)
 app.include_router(pillbox.router)
+app.include_router(notifications.router)
 app.include_router(cron.router)
 
 

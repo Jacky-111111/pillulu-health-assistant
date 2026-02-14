@@ -4,7 +4,7 @@
  */
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://127.0.0.1:8000"
-  : "https://YOUR-RENDER-URL.onrender.com";
+  : "";
 
 // --- Helpers ---
 function showError(containerId, message) {
@@ -67,7 +67,7 @@ async function doSearch() {
       return;
     }
     resultsEl.innerHTML = data.map((m) => {
-      const name = m.brand_name || m.generic_name || m.substance_name || "Unknown";
+      const name = m.display_name || m.brand_name || m.generic_name || m.substance_name || "Medication (name not available)";
       return `
         <div class="med-card">
           <h4>${escapeHtml(name)}</h4>
@@ -233,7 +233,7 @@ async function loadPillbox() {
     listEl.querySelectorAll("[data-add-sched]").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.getElementById("add-schedule-med-id").value = btn.dataset.id;
-        document.getElementById("add-schedule-modal").classList.remove("hidden");
+        openAddScheduleModal();
       });
     });
     listEl.querySelectorAll("[data-del-med]").forEach((btn) => {
@@ -313,6 +313,87 @@ document.getElementById("edit-med-form").addEventListener("submit", async (e) =>
 });
 
 // --- Add Schedule Modal ---
+function getSelectedDays() {
+  const checks = document.querySelectorAll("#add-schedule-days input[data-day]:checked");
+  const days = Array.from(checks).map((c) => c.dataset.day);
+  return days.length === 7 ? "daily" : days.join(",") || "daily";
+}
+
+function computeNextReminder(timeStr, timezone, daysStr) {
+  if (!timeStr) return null;
+  const [hour, min] = timeStr.split(":").map(Number);
+  const selectedDays = daysStr === "daily" ? ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] : daysStr.split(",").map((d) => d.trim().toLowerCase().slice(0, 3));
+  if (selectedDays.length === 0) return null;
+
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  const tzYear = parseInt(get("year"), 10);
+  const tzMonth = parseInt(get("month"), 10) - 1;
+  const tzDay = parseInt(get("day"), 10);
+  const tzHour = parseInt(get("hour"), 10);
+  const tzMin = parseInt(get("minute"), 10);
+  const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+  for (let offset = 0; offset < 8; offset++) {
+    const d = new Date(tzYear, tzMonth, tzDay + offset);
+    const dayName = dayNames[d.getDay()];
+    if (!selectedDays.includes(dayName)) continue;
+
+    const isToday = offset === 0;
+    const timePassed = isToday && (tzHour > hour || (tzHour === hour && tzMin >= min));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    let tzAbbr = "";
+    try {
+      tzAbbr = new Date().toLocaleTimeString("en-US", { timeZone: timezone, timeZoneName: "short" }).split(" ").pop() || timezone;
+    } catch {
+      tzAbbr = timezone;
+    }
+    if (isToday && !timePassed) {
+      return `${y}-${m}-${day} ${timeStr} (${tzAbbr})`;
+    }
+    if (offset > 0) {
+      return `${y}-${m}-${day} ${timeStr} (${tzAbbr})`;
+    }
+  }
+  return null;
+}
+
+function updateNextReminderPreview() {
+  const timeInput = document.getElementById("add-schedule-time").value;
+  const timezone = document.getElementById("add-schedule-timezone")?.value || "America/New_York";
+  const days = getSelectedDays();
+  const el = document.getElementById("next-reminder-preview");
+  const next = computeNextReminder(timeInput, timezone, days);
+  el.textContent = next ? `Next reminder: ${next}` : "Select time and days";
+  if (next) el.innerHTML = `<strong>Next reminder:</strong> ${next}`;
+}
+
+function openAddScheduleModal() {
+  const now = new Date();
+  document.getElementById("add-schedule-time").value = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  document.querySelectorAll("#add-schedule-days input[data-day]").forEach((cb) => (cb.checked = true));
+  updateNextReminderPreview();
+  document.getElementById("add-schedule-modal").classList.remove("hidden");
+}
+
+document.getElementById("add-schedule-time").addEventListener("input", updateNextReminderPreview);
+document.getElementById("add-schedule-time").addEventListener("change", updateNextReminderPreview);
+document.getElementById("add-schedule-timezone").addEventListener("change", updateNextReminderPreview);
+document.getElementById("add-schedule-days").addEventListener("change", updateNextReminderPreview);
+
 document.getElementById("add-schedule-cancel").addEventListener("click", () => {
   document.getElementById("add-schedule-modal").classList.add("hidden");
 });
@@ -321,9 +402,14 @@ document.getElementById("add-schedule-form").addEventListener("submit", async (e
   e.preventDefault();
   const medId = document.getElementById("add-schedule-med-id").value;
   const timeInput = document.getElementById("add-schedule-time").value;
-  const days = document.getElementById("add-schedule-days").value.trim() || "daily";
+  const days = getSelectedDays();
+  const checked = document.querySelectorAll("#add-schedule-days input[data-day]:checked").length;
+  if (checked === 0) {
+    showError("pillbox-error", "Please select at least one day.");
+    return;
+  }
   try {
-    const timezone = document.getElementById("add-schedule-timezone")?.value || "Asia/Shanghai";
+    const timezone = document.getElementById("add-schedule-timezone")?.value || "America/New_York";
     await fetchApi(`/api/pillbox/meds/${medId}/schedules`, {
       method: "POST",
       body: JSON.stringify({
@@ -340,35 +426,102 @@ document.getElementById("add-schedule-form").addEventListener("submit", async (e
   }
 });
 
-// --- Email ---
-async function loadUserEmail() {
+// --- Notifications ---
+const NOTIFICATION_POLL_INTERVAL = 30000; // 30 seconds
+let notificationPollTimer = null;
+let lastUnreadCount = 0;
+
+function formatNotificationTime(isoStr) {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diffMs = now - d;
+  if (diffMs < 60000) return "Just now";
+  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)}m ago`;
+  if (diffMs < 86400000) return `${Math.floor(diffMs / 3600000)}h ago`;
+  return d.toLocaleDateString();
+}
+
+async function loadNotifications() {
   try {
-    const data = await fetchApi("/api/user/email");
-    document.getElementById("user-email").value = data.email || "";
-  } catch {
-    // ignore
+    const items = await fetchApi("/api/notifications");
+    const listEl = document.getElementById("notifications-list");
+    const emptyEl = document.getElementById("notifications-empty");
+    if (!items || items.length === 0) {
+      listEl.innerHTML = "";
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+    emptyEl.classList.add("hidden");
+    listEl.innerHTML = items.map((n) => {
+      const isRead = !!n.read_at;
+      const rowClass = isRead ? "notification-item read" : "notification-item unread";
+      return `
+        <div class="${rowClass}" data-id="${n.id}">
+          <div class="notification-content">
+            <strong>${escapeHtml(n.title)}</strong>
+            <p>${escapeHtml(n.message)}</p>
+            <span class="notification-time">${formatNotificationTime(n.created_at)}</span>
+          </div>
+          ${!isRead ? `<button class="btn btn-small btn-secondary" data-mark-read data-id="${n.id}">Mark read</button>` : ""}
+        </div>
+      `;
+    }).join("");
+
+    listEl.querySelectorAll("[data-mark-read]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await fetchApi(`/api/notifications/${btn.dataset.id}/read`, { method: "PUT" });
+          loadNotifications();
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    });
+
+    // Browser notification when new unread arrives (user has granted permission)
+    const unreadCount = items.filter((n) => !n.read_at).length;
+    if (unreadCount > lastUnreadCount && unreadCount > 0 && "Notification" in window && Notification.permission === "granted") {
+      const newest = items.find((n) => !n.read_at);
+      if (newest) new Notification(newest.title, { body: newest.message });
+    }
+    lastUnreadCount = unreadCount;
+  } catch (err) {
+    console.error("Failed to load notifications:", err);
   }
 }
 
-document.getElementById("save-email-btn").addEventListener("click", async () => {
-  const email = document.getElementById("user-email").value.trim();
-  hideError("email-error");
-  document.getElementById("email-success").classList.add("hidden");
-  if (!email) {
-    showError("email-error", "Please enter your email address");
-    return;
-  }
+document.getElementById("mark-all-read-btn").addEventListener("click", async () => {
   try {
-    await fetchApi("/api/user/email", {
-      method: "PUT",
-      body: JSON.stringify({ email }),
-    });
-    showSuccess("email-success");
+    await fetchApi("/api/notifications/read-all", { method: "PUT" });
+    loadNotifications();
   } catch (err) {
-    showError("email-error", err.message);
+    console.error(err);
   }
 });
 
+document.getElementById("enable-browser-notifications-btn").addEventListener("click", async () => {
+  if (!("Notification" in window)) {
+    alert("Your browser does not support notifications.");
+    return;
+  }
+  if (Notification.permission === "granted") {
+    alert("Browser notifications are already enabled.");
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission === "granted") {
+    new Notification("Pillulu", { body: "Notifications enabled! You'll get reminders here." });
+    document.getElementById("enable-browser-notifications-btn").textContent = "Notifications enabled";
+  }
+});
+
+function startNotificationPolling() {
+  if (notificationPollTimer) clearInterval(notificationPollTimer);
+  notificationPollTimer = setInterval(loadNotifications, NOTIFICATION_POLL_INTERVAL);
+}
+
 // --- Init ---
 loadPillbox();
-loadUserEmail();
+loadNotifications();
+startNotificationPolling();

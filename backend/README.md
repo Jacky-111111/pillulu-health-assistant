@@ -1,6 +1,6 @@
 # Pillulu Health Assistant - Backend
 
-FastAPI backend for medication search, AI Q&A, pillbox management, and email reminders.
+FastAPI backend for medication search, AI Q&A, pillbox management, and in-app notifications.
 
 ## Quick Start (Local)
 
@@ -47,9 +47,12 @@ Health check: http://127.0.0.1:8000/health
 | GET | `/api/pillbox/meds/{id}/schedules` | List schedules |
 | PUT | `/api/schedules/{id}` | Update schedule |
 | DELETE | `/api/schedules/{id}` | Delete schedule |
-| GET | `/api/user/email` | Get user email |
-| PUT | `/api/user/email` | Set user email |
-| POST | `/api/cron/send_reminders` | Cron: send reminders (requires CRON_SECRET) |
+| GET | `/api/user/email` | Get user email (for future email sync) |
+| PUT | `/api/user/email` | Set user email (for future email sync) |
+| GET | `/api/notifications` | List notifications |
+| PUT | `/api/notifications/{id}/read` | Mark notification read |
+| PUT | `/api/notifications/read-all` | Mark all read |
+| POST | `/api/cron/send_reminders` | Cron: create notifications (requires CRON_SECRET) |
 | POST | `/api/cron/decrement_stock` | Cron: decrement stock (optional) |
 
 ## Environment Variables
@@ -57,9 +60,9 @@ Health check: http://127.0.0.1:8000/health
 | Variable | Required | Description |
 |----------|----------|-------------|
 | OPENAI_API_KEY | For AI | OpenAI API key |
-| SENDGRID_API_KEY | For email | SendGrid API key |
-| FROM_EMAIL | For email | Verified sender in SendGrid |
-| APP_BASE_URL | Optional | Frontend URL for email links |
+| SENDGRID_API_KEY | Optional | For future email sync |
+| FROM_EMAIL | Optional | For future email sync |
+| APP_BASE_URL | Optional | Frontend URL |
 | DATABASE_PATH | Optional | Default: ./data/pillulu.db |
 | CRON_SECRET | For cron | Secret for cron endpoints |
 

@@ -1,6 +1,6 @@
 # Pillulu Health Assistant
 
-A web app to help users search medications, ask AI about dosage/info, manage a pillbox with schedules, and receive email reminders.
+A web app to help users search medications, ask AI about dosage/info, manage a pillbox with schedules, and receive in-app notifications for reminders.
 
 **⚠️ Disclaimer:** This app is for educational purposes only. It does not provide medical advice. Always consult a doctor or pharmacist.
 
@@ -23,7 +23,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-# Set env vars: OPENAI_API_KEY, SENDGRID_API_KEY, FROM_EMAIL, CRON_SECRET
+# Set env vars: OPENAI_API_KEY, CRON_SECRET (SENDGRID/FROM_EMAIL optional for future email sync)
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -42,8 +42,8 @@ Update `API_BASE` in `frontend/app.js` if backend URL differs.
 1. **Search Medications** – OpenFDA API
 2. **Ask AI** – OpenAI Chat (dosage, info) with safety disclaimers
 3. **My Pillbox** – Add meds, set stock, thresholds, schedules
-4. **Email Settings** – Store email for reminders
-5. **Cron Reminders** – Time-to-take and low-stock emails via `/api/cron/send_reminders`
+4. **Notifications** – In-app reminders for time-to-take and low stock (browser notifications optional)
+5. **Cron Reminders** – `/api/cron/send_reminders` creates notifications (email sync can be added later)
 
 ## Deployment
 
@@ -55,4 +55,4 @@ See `backend/README.md` and `frontend/README.md` for details.
 
 ## Secrets
 
-Never commit: `OPENAI_API_KEY`, `SENDGRID_API_KEY`, `CRON_SECRET`, `.env`
+Never commit: `OPENAI_API_KEY`, `CRON_SECRET`, `.env`

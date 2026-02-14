@@ -13,6 +13,7 @@ class MedSearchResult(BaseModel):
     route: Optional[str] = None
     substance_name: Optional[str] = None
     warnings_snippet: Optional[str] = None
+    display_name: Optional[str] = None  # Best available name (from openfda or fallback fields)
 
 
 # --- AI Ask ---
@@ -86,9 +87,22 @@ class ScheduleUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-# --- User / Email Settings ---
+# --- User / Email Settings (for future email sync) ---
 class UserEmailUpdate(BaseModel):
     email: str = Field(..., min_length=1, max_length=255)
+
+
+# --- Notifications ---
+class NotificationResponse(BaseModel):
+    id: int
+    type: str
+    title: str
+    message: str
+    created_at: datetime
+    read_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 # --- Cron ---
