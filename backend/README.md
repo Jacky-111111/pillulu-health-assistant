@@ -11,7 +11,7 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create `.env` in `backend/` (or set env vars):
+Create `.env` in `backend/` (or set env vars). Keys are loaded in order: env vars → `.env` (via dotenv) → `secrets.txt` fallback.
 
 ```
 OPENAI_API_KEY=sk-...
@@ -21,6 +21,8 @@ APP_BASE_URL=https://your-username.github.io/pillulu-health-assistant/
 DATABASE_PATH=./data/pillulu.db
 CRON_SECRET=your-random-secret-for-cron
 ```
+
+Optional: `backend/secrets.txt` (one per line: `KEY=value`) as fallback when env vars are empty.
 
 Run:
 
