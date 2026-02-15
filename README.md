@@ -47,8 +47,7 @@ Update `API_BASE` in `frontend/app.js` if backend URL differs.
 
 ## Deployment
 
-- **Backend:** Render Web Service
-- **Frontend:** GitHub Pages or any static host
+- **Merged (recommended):** One Render Web Service serves both frontend and API. See `backend/README.md` for config (Root Directory empty, Build/Start from `backend/`).
 - **Cron:** Render Cron Job → POST `/api/cron/send_reminders` with `X-CRON-SECRET`
 
 See `backend/README.md` and `frontend/README.md` for details.

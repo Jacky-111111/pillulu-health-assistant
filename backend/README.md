@@ -66,13 +66,16 @@ Health check: http://127.0.0.1:8000/health
 | DATABASE_PATH | Optional | Default: ./data/pillulu.db |
 | CRON_SECRET | For cron | Secret for cron endpoints |
 
-## Render Deployment
+## Render Deployment (Merged: frontend + backend in one service)
 
 1. Create a Web Service, connect repo.
-2. Build: `pip install -r requirements.txt`
-3. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Add env vars in Render dashboard.
-5. Ensure `backend/data` exists (Render ephemeral disk) or use Persistent Disk and set `DATABASE_PATH=/var/data/pillulu.db`.
+2. **Root Directory**: leave **empty** (use repo root so both `backend/` and `frontend/` are available).
+3. **Build Command**: `cd backend && pip install -r requirements.txt`
+4. **Start Command**: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Add env vars in Render dashboard (OPENAI_API_KEY, CRON_SECRET, APP_BASE_URL, etc.).
+6. Ensure `backend/data` exists (Render ephemeral disk) or use Persistent Disk and set `DATABASE_PATH=/var/data/pillulu.db`.
+
+The backend serves the frontend at `/` and API at `/api/*`. One URL for the full app.
 
 ## Cron Job (Render Cron)
 
