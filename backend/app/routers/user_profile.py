@@ -18,6 +18,8 @@ def get_profile(user: User = Depends(get_current_user)):
         height_cm=user.height_cm,
         weight_kg=user.weight_kg,
         region=user.region,
+        state=user.state,
+        city=user.city,
     )
 
 
@@ -34,4 +36,6 @@ def update_profile(body: UserProfileUpdate, user: User = Depends(get_current_use
         height_cm=user.height_cm,
         weight_kg=user.weight_kg,
         region=user.region,
+        state=user.state,
+        city=user.city,
     )

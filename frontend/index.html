@@ -33,7 +33,7 @@
           <p class="profile-item"><span class="profile-label">Age:</span> <span id="profile-age">—</span></p>
           <p class="profile-item"><span class="profile-label">Height:</span> <span id="profile-height">—</span> cm</p>
           <p class="profile-item"><span class="profile-label">Weight:</span> <span id="profile-weight">—</span> kg</p>
-          <p class="profile-item"><span class="profile-label">Region:</span> <span id="profile-region">—</span></p>
+          <p class="profile-item"><span class="profile-label">Location:</span> <span id="profile-location">—</span></p>
           <button type="button" id="profile-edit-btn" class="btn btn-secondary btn-small">Edit</button>
         </div>
         <div id="profile-login-prompt" class="profile-login-prompt hidden">
@@ -44,9 +44,12 @@
         <h2>🌤️ Local Weather</h2>
         <div id="weather-widget" class="weather-widget hidden">
           <div class="weather-location" id="weather-location">—</div>
-          <div class="weather-temp" id="weather-temp">—</div>
-          <div class="weather-desc" id="weather-desc">—</div>
-          <div class="weather-details" id="weather-details"></div>
+          <div class="weather-current">
+            <div class="weather-temp" id="weather-temp">—</div>
+            <div class="weather-desc" id="weather-desc">—</div>
+            <div class="weather-details" id="weather-details"></div>
+          </div>
+          <div class="weather-forecast" id="weather-forecast"></div>
         </div>
         <div id="weather-empty" class="weather-empty">
           <p>Set your region in profile to see local weather.</p>
@@ -120,10 +123,15 @@
         <input type="number" id="profile-height-input" min="50" max="300" placeholder="e.g. 170">
         <label for="profile-weight-input">Weight (kg)</label>
         <input type="number" id="profile-weight-input" min="20" max="500" placeholder="e.g. 65">
-        <label for="profile-region-input">Region</label>
-        <select id="profile-region-input">
-          <option value="">Select a region</option>
-          <!-- US regions populated by JS -->
+        <label for="profile-state-input">State</label>
+        <select id="profile-state-input">
+          <option value="">Select state</option>
+          <!-- populated by JS -->
+        </select>
+        <label for="profile-city-input">City / Region</label>
+        <select id="profile-city-input">
+          <option value="">Select city</option>
+          <!-- populated by JS when state selected -->
         </select>
         <div class="modal-actions">
           <button type="button" id="profile-cancel" class="btn btn-secondary">Cancel</button>

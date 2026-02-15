@@ -239,6 +239,36 @@ body {
   opacity: 0.85;
 }
 
+.weather-forecast {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.95;
+}
+
+.forecast-date {
+  font-weight: 600;
+}
+
+.forecast-icon {
+  font-size: 1.1rem;
+}
+
+.forecast-temp {
+  font-size: 0.75rem;
+}
+
 .weather-empty {
   font-size: 0.85rem;
   color: var(--text-muted);

@@ -15,7 +15,9 @@ class User(Base):
     age = Column(Integer, nullable=True)
     height_cm = Column(Integer, nullable=True)
     weight_kg = Column(Integer, nullable=True)
-    region = Column(String(128), nullable=True)
+    region = Column(String(128), nullable=True)  # city/region within state (legacy: was full region)
+    state = Column(String(64), nullable=True)  # US state
+    city = Column(String(128), nullable=True)  # city/region within state
     created_at = Column(DateTime, default=datetime.utcnow)
 
     meds = relationship("Med", back_populates="user", cascade="all, delete-orphan")

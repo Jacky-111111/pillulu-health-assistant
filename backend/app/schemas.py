@@ -98,7 +98,9 @@ class UserProfileResponse(BaseModel):
     age: Optional[int] = None
     height_cm: Optional[int] = None
     weight_kg: Optional[int] = None
-    region: Optional[str] = None
+    region: Optional[str] = None  # legacy
+    state: Optional[str] = None
+    city: Optional[str] = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -106,6 +108,8 @@ class UserProfileUpdate(BaseModel):
     height_cm: Optional[int] = Field(None, ge=50, le=300)
     weight_kg: Optional[int] = Field(None, ge=20, le=500)
     region: Optional[str] = Field(None, max_length=128)
+    state: Optional[str] = Field(None, max_length=64)
+    city: Optional[str] = Field(None, max_length=128)
 
 
 # --- Notifications ---
