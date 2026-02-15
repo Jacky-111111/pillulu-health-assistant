@@ -9,10 +9,10 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 @router.post("/ask", response_model=AIAskResponse)
 async def ai_ask(req: AIAskRequest):
-    """Ask AI about medication. Returns answer with disclaimer."""
+    """Ask AI about medication. Returns answer with disclaimer and suggested meds."""
     try:
-        answer, disclaimer = ask_ai(req.question, req.context_med_name)
-        return AIAskResponse(answer=answer, disclaimer=disclaimer)
+        answer, disclaimer, suggested_medications = ask_ai(req.question, req.context_med_name)
+        return AIAskResponse(answer=answer, disclaimer=disclaimer, suggested_medications=suggested_medications)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:

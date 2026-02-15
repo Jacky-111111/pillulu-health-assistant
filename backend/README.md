@@ -76,13 +76,28 @@ Health check: http://127.0.0.1:8000/health
 
 ## Cron Job (Render Cron)
 
-Create a Cron Job that runs every minute:
+Create a Cron Job that runs **every minute** (required for precise time matching):
 
 - **URL**: `https://YOUR-SERVICE.onrender.com/api/cron/send_reminders`
 - **Method**: POST
 - **Header**: `X-CRON-SECRET: your-cron-secret` (must match CRON_SECRET env var)
 
 Or send JSON body: `{"secret": "your-cron-secret"}`
+
+## Troubleshooting: No reminders received
+
+1. **Cron not running**: Reminders only fire when `/api/cron/send_reminders` is called. Locally, nothing calls it automatically. Use:
+   ```bash
+   # From project root, with CRON_SECRET from backend/.env
+   ./scripts/trigger_reminders.sh http://localhost:8000 your-cron-secret
+   ```
+   Or: `curl -X POST http://localhost:8000/api/cron/send_reminders -H "X-CRON-SECRET: YOUR_SECRET"`
+
+2. **Debug which schedules would match**: `GET /api/cron/debug_reminders?secret=YOUR_SECRET` shows current time per timezone and whether each schedule would fire.
+
+3. **Time must match exactly**: Schedule time (e.g. 08:30) must equal the current minute in the schedule's timezone when cron runs. Cron must run every minute.
+
+4. **Deployed on Render**: Ensure a Cron Job is configured and runs every minute (`* * * * *`).
 
 ## Secrets
 

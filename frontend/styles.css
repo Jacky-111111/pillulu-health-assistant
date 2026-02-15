@@ -259,6 +259,22 @@ label {
   font-size: 0.9rem;
 }
 
+.ai-suggested-meds {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-suggested-meds .suggested-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  width: 100%;
+}
+
 .answer-disclaimer {
   margin-top: 0.5rem;
   font-size: 0.8rem;

@@ -25,6 +25,7 @@ class AIAskRequest(BaseModel):
 class AIAskResponse(BaseModel):
     answer: str
     disclaimer: str
+    suggested_medications: List[str] = []
 
 
 # --- Pillbox Meds ---

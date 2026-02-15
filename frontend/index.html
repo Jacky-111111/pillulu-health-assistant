@@ -21,7 +21,7 @@
     <!-- 1. Search Medications -->
     <section class="section" id="search-section">
       <h2>🔍 Search Medications</h2>
-      <p class="section-desc">Tip: Search by specific drug name (e.g. ibuprofen, amoxicillin) for best results.</p>
+      <p class="section-desc">Tip: Search by specific drug name (e.g. ibuprofen, amoxicillin) for best results. Info from OpenFDA.</p>
       <div class="search-box">
         <input type="text" id="search-input" placeholder="Enter medication name, e.g. ibuprofen, amoxicillin" maxlength="100" aria-label="Search medications">
         <button type="button" id="search-btn" class="btn btn-primary">Search</button>
@@ -43,6 +43,7 @@
       </div>
       <div id="ai-answer" class="ai-answer hidden">
         <div class="answer-content"></div>
+        <div id="ai-suggested-meds" class="ai-suggested-meds hidden"></div>
         <div class="answer-disclaimer"></div>
       </div>
       <div id="ai-error" class="error-banner hidden"></div>

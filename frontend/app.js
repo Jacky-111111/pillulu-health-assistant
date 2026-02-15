@@ -171,6 +171,21 @@ async function doAiAsk() {
     });
     answerEl.querySelector(".answer-content").innerHTML = data.answer.replace(/\n/g, "<br>");
     answerEl.querySelector(".answer-disclaimer").textContent = data.disclaimer;
+
+    const suggestedEl = document.getElementById("ai-suggested-meds");
+    if (data.suggested_medications && data.suggested_medications.length > 0) {
+      suggestedEl.innerHTML = `<p class="suggested-label">Add to Pillbox:</p>` + data.suggested_medications.map((name) =>
+        `<button type="button" class="btn btn-secondary btn-small add-from-ai" data-med-name="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+      ).join(" ");
+      suggestedEl.classList.remove("hidden");
+      suggestedEl.querySelectorAll(".add-from-ai").forEach((btn) => {
+        btn.addEventListener("click", () => openAddMedModal(btn.dataset.medName));
+      });
+    } else {
+      suggestedEl.innerHTML = "";
+      suggestedEl.classList.add("hidden");
+    }
+
     answerEl.classList.remove("hidden");
   } catch (err) {
     showError("ai-error", err.message || "AI service temporarily unavailable. Try again later.");
