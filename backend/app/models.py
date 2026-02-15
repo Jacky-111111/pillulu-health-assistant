@@ -10,8 +10,15 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=True)  # Optional; for future email sync
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    age = Column(Integer, nullable=True)
+    height_cm = Column(Integer, nullable=True)
+    weight_kg = Column(Integer, nullable=True)
+    region = Column(String(128), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    meds = relationship("Med", back_populates="user", cascade="all, delete-orphan")
 
 
 class Notification(Base):
@@ -29,6 +36,7 @@ class Med(Base):
     __tablename__ = "meds"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # nullable for migration
     name = Column(String(255), nullable=False)
     purpose = Column(String(500), nullable=True)
     dosage_notes = Column(Text, nullable=True)
@@ -38,6 +46,7 @@ class Med(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_low_stock_sent_at = Column(Date, nullable=True)  # dedupe daily low-stock emails
 
+    user = relationship("User", back_populates="meds")
     schedules = relationship("Schedule", back_populates="med", cascade="all, delete-orphan")
 
 

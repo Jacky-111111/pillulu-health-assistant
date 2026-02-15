@@ -36,3 +36,4 @@ SENDGRID_API_KEY = _get_secret("SENDGRID_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "https://your-username.github.io/pillulu-health-assistant/")
 CRON_SECRET = _get_secret("CRON_SECRET")
+JWT_SECRET = _get_secret("JWT_SECRET") or "dev-secret-change-in-production"

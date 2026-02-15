@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import med_search, ai, pillbox, cron, notifications
+from app.routers import med_search, ai, pillbox, cron, notifications, auth, user_profile, weather
 
 
 @asynccontextmanager
@@ -34,6 +34,9 @@ app.include_router(ai.router)
 app.include_router(pillbox.router)
 app.include_router(notifications.router)
 app.include_router(cron.router)
+app.include_router(auth.router)
+app.include_router(user_profile.router)
+app.include_router(weather.router)
 
 
 @app.get("/health")

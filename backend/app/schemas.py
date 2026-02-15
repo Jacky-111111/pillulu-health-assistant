@@ -93,6 +93,21 @@ class UserEmailUpdate(BaseModel):
     email: str = Field(..., min_length=1, max_length=255)
 
 
+# --- User Profile ---
+class UserProfileResponse(BaseModel):
+    age: Optional[int] = None
+    height_cm: Optional[int] = None
+    weight_kg: Optional[int] = None
+    region: Optional[str] = None
+
+
+class UserProfileUpdate(BaseModel):
+    age: Optional[int] = Field(None, ge=1, le=150)
+    height_cm: Optional[int] = Field(None, ge=50, le=300)
+    weight_kg: Optional[int] = Field(None, ge=20, le=500)
+    region: Optional[str] = Field(None, max_length=128)
+
+
 # --- Notifications ---
 class NotificationResponse(BaseModel):
     id: int

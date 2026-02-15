@@ -9,15 +9,53 @@
 <body>
   <!-- Header + Disclaimer -->
   <header class="header">
-    <h1 class="logo">💊 Pillulu Health Assistant</h1>
-    <p class="tagline">Manage your medications and take them on time</p>
+    <div class="header-left">
+      <h1 class="logo">💊 Pillulu Health Assistant</h1>
+      <p class="tagline">Manage your medications and take them on time</p>
+    </div>
+    <div class="header-right">
+      <span id="user-email" class="user-email hidden"></span>
+      <button type="button" id="login-btn" class="btn btn-header">Login</button>
+      <button type="button" id="logout-btn" class="btn btn-header hidden">Logout</button>
+    </div>
   </header>
 
   <div class="disclaimer-banner">
     <strong>⚠️ Important:</strong> This app is for educational purposes only and does not provide medical advice. Always consult a doctor or pharmacist before making medication decisions.
   </div>
 
-  <main class="main">
+  <div class="app-layout">
+    <!-- Left sidebar: User Profile -->
+    <aside class="sidebar">
+      <section class="section profile-section">
+        <h2>👤 User Profile</h2>
+        <div id="profile-display" class="profile-display">
+          <p class="profile-item"><span class="profile-label">Age:</span> <span id="profile-age">—</span></p>
+          <p class="profile-item"><span class="profile-label">Height:</span> <span id="profile-height">—</span> cm</p>
+          <p class="profile-item"><span class="profile-label">Weight:</span> <span id="profile-weight">—</span> kg</p>
+          <p class="profile-item"><span class="profile-label">Region:</span> <span id="profile-region">—</span></p>
+          <button type="button" id="profile-edit-btn" class="btn btn-secondary btn-small">Edit</button>
+        </div>
+        <div id="profile-login-prompt" class="profile-login-prompt hidden">
+          <p>Log in to view and edit your profile.</p>
+        </div>
+      </section>
+      <section class="section weather-section" id="weather-section">
+        <h2>🌤️ Local Weather</h2>
+        <div id="weather-widget" class="weather-widget hidden">
+          <div class="weather-location" id="weather-location">—</div>
+          <div class="weather-temp" id="weather-temp">—</div>
+          <div class="weather-desc" id="weather-desc">—</div>
+          <div class="weather-details" id="weather-details"></div>
+        </div>
+        <div id="weather-empty" class="weather-empty">
+          <p>Set your region in profile to see local weather.</p>
+        </div>
+        <p class="weather-attribution">Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
+      </section>
+    </aside>
+
+    <main class="main">
     <!-- 1. Search Medications -->
     <section class="section" id="search-section">
       <h2>🔍 Search Medications</h2>
@@ -69,6 +107,54 @@
       <div id="notifications-empty" class="empty-state hidden">No notifications yet</div>
     </section>
   </main>
+  </div>
+
+  <!-- Modal for Edit Profile -->
+  <div id="profile-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Edit Profile</h3>
+      <form id="profile-form">
+        <label for="profile-age">Age</label>
+        <input type="number" id="profile-age-input" min="1" max="150" placeholder="e.g. 35">
+        <label for="profile-height-input">Height (cm)</label>
+        <input type="number" id="profile-height-input" min="50" max="300" placeholder="e.g. 170">
+        <label for="profile-weight-input">Weight (kg)</label>
+        <input type="number" id="profile-weight-input" min="20" max="500" placeholder="e.g. 65">
+        <label for="profile-region-input">Region</label>
+        <select id="profile-region-input">
+          <option value="">Select a region</option>
+          <!-- US regions populated by JS -->
+        </select>
+        <div class="modal-actions">
+          <button type="button" id="profile-cancel" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Login / Register -->
+  <div id="login-modal" class="modal hidden">
+    <div class="modal-content login-modal-content">
+      <h3>User Login</h3>
+      <div class="login-form">
+        <label for="login-email">Email:</label>
+        <input type="email" id="login-email" placeholder="your@email.com">
+        <label for="login-password">Password:</label>
+        <input type="password" id="login-password" placeholder="Password">
+        <button type="button" id="login-submit" class="btn btn-primary">Login</button>
+      </div>
+      <p class="login-divider">New User?</p>
+      <div class="register-form">
+        <label for="register-email">Choose Email:</label>
+        <input type="email" id="register-email" placeholder="your@email.com">
+        <label for="register-password">Choose Password:</label>
+        <input type="password" id="register-password" placeholder="At least 6 characters">
+        <button type="button" id="register-submit" class="btn btn-success">Create Account</button>
+      </div>
+      <button type="button" id="login-modal-close" class="modal-close">×</button>
+    </div>
+  </div>
 
   <!-- Modal for Add to Pillbox -->
   <div id="add-med-modal" class="modal hidden">
@@ -90,6 +176,18 @@
           <button type="submit" class="btn btn-primary">Add</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal for Delete Med Confirmation -->
+  <div id="delete-med-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Delete medication</h3>
+      <p id="delete-med-message">Are you sure you want to delete this medication?</p>
+      <div class="modal-actions">
+        <button type="button" id="delete-med-cancel" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="delete-med-confirm" class="btn btn-primary" style="background: var(--error);">Delete</button>
+      </div>
     </div>
   </div>
 
@@ -151,6 +249,7 @@
     </div>
   </div>
 
+  <footer class="page-footer">Jack Yu © 2026. Built with help of Cursor.</footer>
   <script src="app.js"></script>
 </body>
 </html>

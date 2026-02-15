@@ -26,21 +26,348 @@ function showSuccess(containerId) {
   setTimeout(() => el.classList.add("hidden"), 3000);
 }
 
+const AUTH_TOKEN_KEY = "pillulu_token";
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+function setAuthToken(token) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 async function fetchApi(path, options = {}) {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+  const token = getAuthToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `Request failed: ${res.status}`);
   }
   return res.json();
 }
+
+// --- Auth ---
+async function checkAuth() {
+  try {
+    const me = await fetchApi("/api/auth/me");
+    return me.logged_in ? me : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateAuthUI(user) {
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const userEmail = document.getElementById("user-email");
+  if (user) {
+    loginBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+    userEmail.textContent = user.email;
+    userEmail.classList.remove("hidden");
+  } else {
+    loginBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+    userEmail.classList.add("hidden");
+  }
+}
+
+document.getElementById("login-btn").addEventListener("click", () => {
+  document.getElementById("login-modal").classList.remove("hidden");
+});
+
+document.getElementById("login-modal").addEventListener("click", (e) => {
+  if (e.target.id === "login-modal") document.getElementById("login-modal").classList.add("hidden");
+});
+document.getElementById("login-modal-close").addEventListener("click", () => {
+  document.getElementById("login-modal").classList.add("hidden");
+});
+
+document.getElementById("login-submit").addEventListener("click", async () => {
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  if (!email || !password) {
+    alert("Please enter email and password.");
+    return;
+  }
+  try {
+    const data = await fetchApi("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    setAuthToken(data.token);
+    updateAuthUI({ email: data.email });
+    document.getElementById("login-modal").classList.add("hidden");
+    document.getElementById("login-email").value = "";
+    document.getElementById("login-password").value = "";
+    loadPillbox();
+    loadProfile();
+  } catch (err) {
+    alert(err.message || "Login failed.");
+  }
+});
+
+document.getElementById("register-submit").addEventListener("click", async () => {
+  const email = document.getElementById("register-email").value.trim();
+  const password = document.getElementById("register-password").value;
+  if (!email || !password) {
+    alert("Please enter email and password.");
+    return;
+  }
+  if (password.length < 6) {
+    alert("Password must be at least 6 characters.");
+    return;
+  }
+  try {
+    const data = await fetchApi("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    setAuthToken(data.token);
+    updateAuthUI({ email: data.email });
+    document.getElementById("login-modal").classList.add("hidden");
+    document.getElementById("register-email").value = "";
+    document.getElementById("register-password").value = "";
+    loadPillbox();
+    loadProfile();
+  } catch (err) {
+    alert(err.message || "Registration failed.");
+  }
+});
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  clearAuthToken();
+  updateAuthUI(null);
+  loadPillbox();
+  updateProfileUI(null);
+  loadWeather(null);
+});
+
+// --- US Regions (state name, lat/lon for weather) ---
+const US_REGIONS = [
+  { value: "Alabama", lat: 32.3668, lon: -86.3000 },
+  { value: "Alaska", lat: 58.3019, lon: -134.4197 },
+  { value: "Arizona", lat: 33.4484, lon: -112.0740 },
+  { value: "Arkansas", lat: 34.7465, lon: -92.2896 },
+  { value: "California", lat: 37.7749, lon: -122.4194 },
+  { value: "Colorado", lat: 39.7392, lon: -104.9903 },
+  { value: "Connecticut", lat: 41.7658, lon: -72.6734 },
+  { value: "Delaware", lat: 38.9108, lon: -75.5277 },
+  { value: "Florida", lat: 25.7617, lon: -80.1918 },
+  { value: "Georgia", lat: 33.7490, lon: -84.3880 },
+  { value: "Hawaii", lat: 21.3099, lon: -157.8581 },
+  { value: "Idaho", lat: 43.6150, lon: -116.2023 },
+  { value: "Illinois", lat: 41.8781, lon: -87.6298 },
+  { value: "Indiana", lat: 39.7684, lon: -86.1581 },
+  { value: "Iowa", lat: 41.5868, lon: -93.6250 },
+  { value: "Kansas", lat: 39.0473, lon: -95.6752 },
+  { value: "Kentucky", lat: 38.2527, lon: -85.7585 },
+  { value: "Louisiana", lat: 29.9511, lon: -90.0715 },
+  { value: "Maine", lat: 43.6591, lon: -70.2568 },
+  { value: "Maryland", lat: 39.2904, lon: -76.6122 },
+  { value: "Massachusetts", lat: 42.3601, lon: -71.0589 },
+  { value: "Michigan", lat: 42.3314, lon: -83.0458 },
+  { value: "Minnesota", lat: 44.9778, lon: -93.2650 },
+  { value: "Mississippi", lat: 32.2988, lon: -90.1848 },
+  { value: "Missouri", lat: 38.6270, lon: -90.1994 },
+  { value: "Montana", lat: 46.5891, lon: -112.0391 },
+  { value: "Nebraska", lat: 40.8086, lon: -96.6783 },
+  { value: "Nevada", lat: 36.1699, lon: -115.1398 },
+  { value: "New Hampshire", lat: 43.1939, lon: -71.5724 },
+  { value: "New Jersey", lat: 40.7128, lon: -74.0060 },
+  { value: "New Mexico", lat: 35.0844, lon: -106.6504 },
+  { value: "New York", lat: 40.7128, lon: -74.0060 },
+  { value: "North Carolina", lat: 35.2271, lon: -80.8431 },
+  { value: "North Dakota", lat: 46.8772, lon: -96.7898 },
+  { value: "Ohio", lat: 39.9612, lon: -82.9988 },
+  { value: "Oklahoma", lat: 35.4676, lon: -97.5164 },
+  { value: "Oregon", lat: 45.5152, lon: -122.6784 },
+  { value: "Pennsylvania", lat: 39.9526, lon: -75.1652 },
+  { value: "Rhode Island", lat: 41.8240, lon: -71.4128 },
+  { value: "South Carolina", lat: 34.0522, lon: -81.0320 },
+  { value: "South Dakota", lat: 43.5446, lon: -96.7311 },
+  { value: "Tennessee", lat: 36.1627, lon: -86.7816 },
+  { value: "Texas", lat: 29.7604, lon: -95.3698 },
+  { value: "Utah", lat: 40.7608, lon: -111.8910 },
+  { value: "Vermont", lat: 44.2601, lon: -72.5754 },
+  { value: "Virginia", lat: 37.5407, lon: -77.4360 },
+  { value: "Washington", lat: 47.6062, lon: -122.3321 },
+  { value: "West Virginia", lat: 38.3498, lon: -81.6326 },
+  { value: "Wisconsin", lat: 43.0731, lon: -89.4012 },
+  { value: "Wyoming", lat: 41.1399, lon: -104.8202 },
+  { value: "District of Columbia", lat: 38.9072, lon: -77.0369 },
+];
+
+function getRegionCoords(regionValue) {
+  return US_REGIONS.find((r) => r.value === regionValue);
+}
+
+function populateRegionSelect() {
+  const sel = document.getElementById("profile-region-input");
+  US_REGIONS.forEach((r) => {
+    const opt = document.createElement("option");
+    opt.value = r.value;
+    opt.textContent = r.value;
+    sel.appendChild(opt);
+  });
+}
+
+// --- User Profile ---
+function renderProfileValue(val) {
+  return val != null && val !== "" ? String(val) : "—";
+}
+
+function updateProfileUI(profile) {
+  const displayEl = document.getElementById("profile-display");
+  const promptEl = document.getElementById("profile-login-prompt");
+  const editBtn = document.getElementById("profile-edit-btn");
+  if (profile) {
+    displayEl.classList.remove("hidden");
+    promptEl.classList.add("hidden");
+    document.getElementById("profile-age").textContent = renderProfileValue(profile.age);
+    document.getElementById("profile-height").textContent = renderProfileValue(profile.height_cm);
+    document.getElementById("profile-weight").textContent = renderProfileValue(profile.weight_kg);
+    document.getElementById("profile-region").textContent = renderProfileValue(profile.region);
+    editBtn.disabled = false;
+  } else {
+    displayEl.classList.add("hidden");
+    promptEl.classList.remove("hidden");
+    editBtn.disabled = true;
+  }
+}
+
+async function loadProfile() {
+  if (!getAuthToken()) {
+    updateProfileUI(null);
+    loadWeather(null);
+    return;
+  }
+  try {
+    const p = await fetchApi("/api/user/profile");
+    updateProfileUI(p);
+    loadWeather(p?.region);
+  } catch {
+    updateProfileUI(null);
+    loadWeather(null);
+  }
+}
+
+// --- Weather (Open-Meteo, no API key) ---
+const WEATHER_CODE_MAP = {
+  0: { desc: "Clear", icon: "☀️" },
+  1: { desc: "Mainly clear", icon: "🌤️" },
+  2: { desc: "Partly cloudy", icon: "⛅" },
+  3: { desc: "Overcast", icon: "☁️" },
+  45: { desc: "Foggy", icon: "🌫️" },
+  48: { desc: "Depositing rime fog", icon: "🌫️" },
+  51: { desc: "Light drizzle", icon: "🌧️" },
+  53: { desc: "Drizzle", icon: "🌧️" },
+  55: { desc: "Dense drizzle", icon: "🌧️" },
+  61: { desc: "Slight rain", icon: "🌧️" },
+  63: { desc: "Rain", icon: "🌧️" },
+  65: { desc: "Heavy rain", icon: "⛈️" },
+  71: { desc: "Slight snow", icon: "🌨️" },
+  73: { desc: "Snow", icon: "🌨️" },
+  75: { desc: "Heavy snow", icon: "❄️" },
+  77: { desc: "Snow grains", icon: "🌨️" },
+  80: { desc: "Slight showers", icon: "🌦️" },
+  81: { desc: "Showers", icon: "🌦️" },
+  82: { desc: "Heavy showers", icon: "⛈️" },
+  85: { desc: "Slight snow showers", icon: "🌨️" },
+  86: { desc: "Heavy snow showers", icon: "❄️" },
+  95: { desc: "Thunderstorm", icon: "⛈️" },
+  96: { desc: "Thunderstorm with hail", icon: "⛈️" },
+};
+
+function getWeatherInfo(code) {
+  return WEATHER_CODE_MAP[code] || { desc: "Unknown", icon: "🌡️" };
+}
+
+async function loadWeather(regionValue) {
+  const widgetEl = document.getElementById("weather-widget");
+  const emptyEl = document.getElementById("weather-empty");
+  if (!regionValue) {
+    widgetEl.classList.add("hidden");
+    emptyEl.classList.remove("hidden");
+    emptyEl.querySelector("p").textContent = "Set your region in profile to see local weather.";
+    return;
+  }
+  const coords = getRegionCoords(regionValue);
+  if (!coords) {
+    widgetEl.classList.add("hidden");
+    emptyEl.classList.remove("hidden");
+    emptyEl.querySelector("p").textContent = "Set your region in profile to see local weather.";
+    return;
+  }
+  try {
+    const cw = await fetchApi(`/api/weather/${encodeURIComponent(regionValue)}`);
+    const info = getWeatherInfo(cw.weathercode);
+    const tempF = Math.round(cw.temperature * 9 / 5 + 32);
+    document.getElementById("weather-location").textContent = regionValue;
+    document.getElementById("weather-temp").innerHTML = `<span class="weather-temp-value">${tempF}</span>°F <span class="weather-temp-alt">(${Math.round(cw.temperature)}°C)</span>`;
+    document.getElementById("weather-desc").textContent = `${info.icon} ${info.desc}`;
+    document.getElementById("weather-details").innerHTML = `Wind: ${cw.windspeed} km/h`;
+    widgetEl.classList.remove("hidden");
+    emptyEl.classList.add("hidden");
+  } catch {
+    widgetEl.classList.add("hidden");
+    emptyEl.classList.remove("hidden");
+    emptyEl.querySelector("p").textContent = "Unable to load weather. Try again later.";
+  }
+}
+
+document.getElementById("profile-edit-btn").addEventListener("click", async () => {
+  if (!getAuthToken()) return;
+  try {
+    const p = await fetchApi("/api/user/profile");
+    document.getElementById("profile-age-input").value = p.age ?? "";
+    document.getElementById("profile-height-input").value = p.height_cm ?? "";
+    document.getElementById("profile-weight-input").value = p.weight_kg ?? "";
+    document.getElementById("profile-region-input").value = p.region ?? "";
+    document.getElementById("profile-modal").classList.remove("hidden");
+  } catch {
+    alert("Please log in to edit your profile.");
+  }
+});
+
+document.getElementById("profile-cancel").addEventListener("click", () => {
+  document.getElementById("profile-modal").classList.add("hidden");
+});
+
+document.getElementById("profile-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const age = document.getElementById("profile-age-input").value;
+  const height_cm = document.getElementById("profile-height-input").value;
+  const weight_kg = document.getElementById("profile-weight-input").value;
+  const region = document.getElementById("profile-region-input").value || null;
+  try {
+    await fetchApi("/api/user/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        age: age ? parseInt(age, 10) : null,
+        height_cm: height_cm ? parseInt(height_cm, 10) : null,
+        weight_kg: weight_kg ? parseInt(weight_kg, 10) : null,
+        region,
+      }),
+    });
+    document.getElementById("profile-modal").classList.add("hidden");
+    loadProfile();
+    loadWeather(region);
+  } catch (err) {
+    alert(err.message || "Failed to save profile.");
+  }
+});
 
 // --- Search ---
 document.getElementById("search-btn").addEventListener("click", doSearch);
@@ -236,7 +563,7 @@ async function loadPillbox() {
           <div class="card-actions">
             <button class="btn btn-secondary btn-small" data-edit-med data-id="${m.id}">Edit</button>
             <button class="btn btn-primary btn-small" data-add-sched data-id="${m.id}" data-name="${escapeHtml(m.name)}">Add time</button>
-            <button class="btn btn-secondary btn-small" data-del-med data-id="${m.id}">Delete</button>
+            <button class="btn btn-secondary btn-small" data-del-med data-id="${m.id}" data-name="${escapeHtml(m.name)}">Delete</button>
           </div>
         </div>
       `;
@@ -252,7 +579,7 @@ async function loadPillbox() {
       });
     });
     listEl.querySelectorAll("[data-del-med]").forEach((btn) => {
-      btn.addEventListener("click", () => deleteMed(parseInt(btn.dataset.id, 10)));
+      btn.addEventListener("click", () => openDeleteMedModal(parseInt(btn.dataset.id, 10), btn.dataset.name || ""));
     });
     listEl.querySelectorAll("[data-edit-sched]").forEach((btn) => {
       btn.addEventListener("click", () => alert("Edit schedule: use API or a future version"));
@@ -261,20 +588,44 @@ async function loadPillbox() {
       btn.addEventListener("click", () => deleteSchedule(parseInt(btn.dataset.id, 10)));
     });
   } catch (err) {
-    showError("pillbox-error", err.message || "Failed to load pillbox. Check your connection.");
-    listEl.innerHTML = "";
+    if (err.message && (err.message.includes("Login required") || err.message.includes("401"))) {
+      clearAuthToken();
+      updateAuthUI(null);
+      listEl.innerHTML = '<p class="empty-state">Please log in to view your pillbox.</p>';
+    } else {
+      showError("pillbox-error", err.message || "Failed to load pillbox. Check your connection.");
+      listEl.innerHTML = "";
+    }
   }
 }
 
-async function deleteMed(id) {
-  if (!confirm("Delete this medication?")) return;
+let pendingDeleteMedId = null;
+
+function openDeleteMedModal(id, name) {
+  pendingDeleteMedId = id;
+  document.getElementById("delete-med-message").textContent = name
+    ? `Are you sure you want to delete "${name}"?`
+    : "Are you sure you want to delete this medication?";
+  document.getElementById("delete-med-modal").classList.remove("hidden");
+}
+
+document.getElementById("delete-med-cancel").addEventListener("click", () => {
+  document.getElementById("delete-med-modal").classList.add("hidden");
+  pendingDeleteMedId = null;
+});
+
+document.getElementById("delete-med-confirm").addEventListener("click", async () => {
+  if (pendingDeleteMedId == null) return;
+  const id = pendingDeleteMedId;
+  document.getElementById("delete-med-modal").classList.add("hidden");
+  pendingDeleteMedId = null;
   try {
     await fetchApi(`/api/pillbox/meds/${id}`, { method: "DELETE" });
     loadPillbox();
   } catch (err) {
     showError("pillbox-error", err.message);
   }
-}
+});
 
 async function deleteSchedule(id) {
   if (!confirm("Delete this reminder time?")) return;
@@ -537,6 +888,19 @@ function startNotificationPolling() {
 }
 
 // --- Init ---
-loadPillbox();
+populateRegionSelect();
+
+(async () => {
+  const user = await checkAuth();
+  updateAuthUI(user);
+  if (user) {
+    loadPillbox();
+    loadProfile();
+  } else {
+    document.getElementById("pillbox-list").innerHTML = '<p class="empty-state">Please log in to view your pillbox.</p>';
+    updateProfileUI(null);
+    loadWeather(null);
+  }
+})();
 loadNotifications();
 startNotificationPolling();
