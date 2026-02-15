@@ -502,6 +502,8 @@ async function doAiAsk() {
 }
 
 // --- Pillbox ---
+let cachedMeds = [];
+
 async function loadPillbox() {
   hideError("pillbox-error");
   const listEl = document.getElementById("pillbox-list");
@@ -511,6 +513,7 @@ async function loadPillbox() {
 
   try {
     const meds = await fetchApi("/api/pillbox/meds");
+    cachedMeds = meds || [];
     if (!meds || meds.length === 0) {
       listEl.innerHTML = "";
       emptyEl.classList.remove("hidden");
@@ -566,6 +569,7 @@ async function loadPillbox() {
     listEl.querySelectorAll("[data-del-sched]").forEach((btn) => {
       btn.addEventListener("click", () => deleteSchedule(parseInt(btn.dataset.id, 10)));
     });
+    startCountdownUpdates();
   } catch (err) {
     if (err.message && (err.message.includes("Login required") || err.message.includes("401"))) {
       clearAuthToken();
@@ -664,7 +668,26 @@ function getSelectedDays() {
   return days.length === 7 ? "daily" : days.join(",") || "daily";
 }
 
-function computeNextReminder(timeStr, timezone, daysStr) {
+function getTimezoneOffsetHours(timezone, year, month, day) {
+  try {
+    const utcNoon = Date.UTC(year, month - 1, day, 12, 0, 0);
+    const d = new Date(utcNoon);
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(d);
+    const h = parseInt(parts.find((p) => p.type === "hour")?.value || "12", 10);
+    return h - 12;
+  } catch {
+    return 0;
+  }
+}
+
+/** Returns { date: Date, displayStr: string } or null. Used for countdown. */
+function getNextReminderDate(timeStr, timezone, daysStr) {
   if (!timeStr) return null;
   const [hour, min] = timeStr.split(":").map(Number);
   const selectedDays = daysStr === "daily" ? ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] : daysStr.split(",").map((d) => d.trim().toLowerCase().slice(0, 3));
@@ -698,22 +721,26 @@ function computeNextReminder(timeStr, timezone, daysStr) {
     const isToday = offset === 0;
     const timePassed = isToday && (tzHour > hour || (tzHour === hour && tzMin >= min));
     const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const offsetH = getTimezoneOffsetHours(timezone, y, m, day);
+    const utcDate = new Date(Date.UTC(y, m - 1, day, hour - offsetH, min || 0, 0, 0));
     let tzAbbr = "";
     try {
       tzAbbr = new Date().toLocaleTimeString("en-US", { timeZone: timezone, timeZoneName: "short" }).split(" ").pop() || timezone;
     } catch {
       tzAbbr = timezone;
     }
-    if (isToday && !timePassed) {
-      return `${y}-${m}-${day} ${timeStr} (${tzAbbr})`;
-    }
-    if (offset > 0) {
-      return `${y}-${m}-${day} ${timeStr} (${tzAbbr})`;
-    }
+    const displayStr = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")} ${timeStr} (${tzAbbr})`;
+    if (isToday && !timePassed) return { date: utcDate, displayStr };
+    if (offset > 0) return { date: utcDate, displayStr };
   }
   return null;
+}
+
+function computeNextReminder(timeStr, timezone, daysStr) {
+  const r = getNextReminderDate(timeStr, timezone, daysStr);
+  return r ? r.displayStr : null;
 }
 
 function updateNextReminderPreview() {
@@ -774,7 +801,70 @@ document.getElementById("add-schedule-form").addEventListener("submit", async (e
 // --- Notifications ---
 const NOTIFICATION_POLL_INTERVAL = 30000; // 30 seconds
 let notificationPollTimer = null;
-let lastUnreadCount = 0;
+let countdownInterval = null;
+
+function formatCountdown(ms) {
+  if (ms <= 0) return "Now";
+  const s = Math.floor(ms / 1000) % 60;
+  const m = Math.floor(ms / 60000) % 60;
+  const h = Math.floor(ms / 3600000) % 24;
+  const d = Math.floor(ms / 86400000);
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return parts.join(" ");
+}
+
+function renderCountdown() {
+  const listEl = document.getElementById("countdown-list");
+  const emptyEl = document.getElementById("countdown-empty");
+  if (!listEl || !emptyEl) return;
+
+  const meds = cachedMeds || [];
+  const items = [];
+  for (const m of meds) {
+    const schedules = (m.schedules || []).filter((s) => s.enabled !== false);
+    for (const s of schedules) {
+      const next = getNextReminderDate(s.time_of_day, s.timezone || "America/New_York", s.days_of_week || "daily");
+      if (next) {
+        const ms = next.date.getTime() - Date.now();
+        items.push({
+          medName: m.name,
+          timeStr: s.time_of_day,
+          displayStr: next.displayStr,
+          ms,
+        });
+      }
+    }
+  }
+  items.sort((a, b) => a.ms - b.ms);
+
+  if (items.length === 0) {
+    listEl.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+  listEl.innerHTML = items
+    .map(
+      (it) => `
+    <div class="countdown-item">
+      <div class="countdown-med">${escapeHtml(it.medName)}</div>
+      <div class="countdown-time">${escapeHtml(it.timeStr)} · ${escapeHtml(it.displayStr)}</div>
+      <div class="countdown-timer">${formatCountdown(it.ms)}</div>
+    </div>
+  `
+    )
+    .join("");
+}
+
+function startCountdownUpdates() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  renderCountdown();
+  countdownInterval = setInterval(renderCountdown, 1000);
+}
 
 function formatNotificationTime(isoStr) {
   if (!isoStr) return "";
@@ -823,14 +913,6 @@ async function loadNotifications() {
         }
       });
     });
-
-    // Browser notification when new unread arrives (user has granted permission)
-    const unreadCount = items.filter((n) => !n.read_at).length;
-    if (unreadCount > lastUnreadCount && unreadCount > 0 && "Notification" in window && Notification.permission === "granted") {
-      const newest = items.find((n) => !n.read_at);
-      if (newest) new Notification(newest.title, { body: newest.message });
-    }
-    lastUnreadCount = unreadCount;
   } catch (err) {
     console.error("Failed to load notifications:", err);
   }
@@ -842,22 +924,6 @@ document.getElementById("mark-all-read-btn").addEventListener("click", async () 
     loadNotifications();
   } catch (err) {
     console.error(err);
-  }
-});
-
-document.getElementById("enable-browser-notifications-btn").addEventListener("click", async () => {
-  if (!("Notification" in window)) {
-    alert("Your browser does not support notifications.");
-    return;
-  }
-  if (Notification.permission === "granted") {
-    alert("Browser notifications are already enabled.");
-    return;
-  }
-  const permission = await Notification.requestPermission();
-  if (permission === "granted") {
-    new Notification("Pillulu", { body: "Notifications enabled! You'll get reminders here." });
-    document.getElementById("enable-browser-notifications-btn").textContent = "Notifications enabled";
   }
 });
 
@@ -883,3 +949,4 @@ populateStateSelect();
 })();
 loadNotifications();
 startNotificationPolling();
+renderCountdown();

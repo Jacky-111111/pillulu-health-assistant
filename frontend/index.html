@@ -101,9 +101,14 @@
     <!-- 4. Notifications -->
     <section class="section" id="notifications-section">
       <h2>🔔 Notifications</h2>
-      <p class="section-desc">Time-to-take reminders and low stock alerts appear here. Enable browser notifications for alerts when the tab is in the background.</p>
+      <p class="section-desc">Countdown to next dose and reminder history.</p>
+      <div class="countdown-section">
+        <h3 class="countdown-title">⏱ Next dose countdown</h3>
+        <div id="countdown-list" class="countdown-list"></div>
+        <div id="countdown-empty" class="empty-state hidden">Add medications and reminder times in My Pillbox to see countdown</div>
+      </div>
       <div class="notifications-header">
-        <button type="button" id="enable-browser-notifications-btn" class="btn btn-secondary btn-small">Enable browser notifications</button>
+        <span class="notifications-subtitle">Reminder history</span>
         <button type="button" id="mark-all-read-btn" class="btn btn-secondary btn-small">Mark all read</button>
       </div>
       <div id="notifications-list" class="notifications-list"></div>
