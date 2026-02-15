@@ -449,6 +449,10 @@ label {
 }
 
 /* AI */
+#ai-section {
+  overflow-y: auto;
+}
+
 #ai-section .ai-form {
   flex-shrink: 0;
 }
@@ -469,7 +473,6 @@ label {
 #ai-section #ai-answer {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 
 .ai-answer {
