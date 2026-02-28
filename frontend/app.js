@@ -5,6 +5,7 @@
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://127.0.0.1:8000"
   : "";
+const MED_PLACEHOLDER_IMAGE = "icons8-pill-80.png";
 
 // --- Helpers ---
 function showError(containerId, message) {
@@ -24,6 +25,13 @@ function showSuccess(containerId) {
   if (!el) return;
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 3000);
+}
+
+function cleanOptionalStr(value, maxLen = 255) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  return text.slice(0, maxLen);
 }
 
 function initClearableInput(inputId, clearBtnId) {
@@ -112,6 +120,37 @@ document.getElementById("login-modal").addEventListener("click", (e) => {
 document.getElementById("login-modal-close").addEventListener("click", () => {
   document.getElementById("login-modal").classList.add("hidden");
 });
+
+document.getElementById("oauth-google-btn").addEventListener("click", () => {
+  window.location.href = `${API_BASE}/api/auth/oauth/google/start`;
+});
+
+function handleOAuthRedirectResult() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("token");
+  const email = url.searchParams.get("email");
+  const oauthError = url.searchParams.get("oauth_error");
+
+  const clearOAuthParams = () => {
+    ["token", "email", "oauth_error"].forEach((key) => url.searchParams.delete(key));
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  if (oauthError) {
+    alert(oauthError);
+    clearOAuthParams();
+    return null;
+  }
+
+  if (token && email) {
+    setAuthToken(token);
+    updateAuthUI({ email });
+    document.getElementById("login-modal").classList.add("hidden");
+    clearOAuthParams();
+    return { email };
+  }
+  return null;
+}
 
 document.getElementById("login-submit").addEventListener("click", async () => {
   const email = document.getElementById("login-email").value.trim();
@@ -374,6 +413,9 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
 });
 
 // --- Search ---
+let lastSearchResults = [];
+let pendingAddMedMeta = null;
+
 document.getElementById("search-btn").addEventListener("click", doSearch);
 document.getElementById("search-input").addEventListener("keypress", (e) => {
   if (e.key === "Enter") doSearch();
@@ -544,22 +586,37 @@ async function doSearch() {
   resultsEl.innerHTML = '<p style="text-align:center;color:#666;">Searching...</p>';
   try {
     const data = await fetchApi(`/api/med/search?q=${encodeURIComponent(q)}`);
+    lastSearchResults = data || [];
     if (!data || data.length === 0) {
       resultsEl.innerHTML = '<p style="text-align:center;color:#666;">No medications found. Try different keywords.</p>';
       return;
     }
-    resultsEl.innerHTML = data.map((m) => {
+    resultsEl.innerHTML = data.map((m, idx) => {
       const name = m.display_name || m.brand_name || m.generic_name || m.substance_name || "Medication (name not available)";
+      const imageUrl = m.image_url || MED_PLACEHOLDER_IMAGE;
+      const canonicalName = m.canonical_name && m.canonical_name !== name ? m.canonical_name : null;
+      const appearanceItems = [
+        m.imprint ? `Imprint: ${escapeHtml(m.imprint)}` : null,
+        m.color ? `Color: ${escapeHtml(m.color)}` : null,
+        m.shape ? `Shape: ${escapeHtml(m.shape)}` : null,
+      ].filter(Boolean);
       return `
         <div class="med-card">
-          <h4>${escapeHtml(name)}</h4>
+          <div class="med-card-top">
+            <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" class="med-thumb" loading="lazy" onerror="this.onerror=null;this.src='${MED_PLACEHOLDER_IMAGE}'">
+            <div class="med-main">
+              <h4>${escapeHtml(name)}</h4>
+              ${canonicalName ? `<p class="med-canonical">Standard: ${escapeHtml(canonicalName)}</p>` : ""}
+            </div>
+          </div>
           ${m.generic_name ? `<p>Generic: ${escapeHtml(m.generic_name)}</p>` : ""}
           ${m.manufacturer ? `<p>Manufacturer: ${escapeHtml(m.manufacturer)}</p>` : ""}
           ${m.route ? `<p>Route: ${escapeHtml(m.route)}</p>` : ""}
+          ${appearanceItems.length ? `<p>${appearanceItems.join(" | ")}</p>` : ""}
           ${m.warnings_snippet ? `<p>Warnings: ${escapeHtml(m.warnings_snippet.substring(0, 150))}...</p>` : ""}
           <div class="card-actions">
             <button class="btn btn-secondary btn-small" data-action="ask" data-name="${escapeHtml(name)}">Ask AI</button>
-            <button class="btn btn-primary btn-small" data-action="add" data-name="${escapeHtml(name)}">Add to Pillbox</button>
+            <button class="btn btn-primary btn-small" data-action="add" data-name="${escapeHtml(name)}" data-idx="${idx}">Add to Pillbox</button>
           </div>
         </div>
       `;
@@ -569,15 +626,20 @@ async function doSearch() {
       btn.addEventListener("click", () => {
         const action = btn.dataset.action;
         const name = btn.dataset.name;
+        const idx = Number(btn.dataset.idx);
         if (action === "ask") {
           document.getElementById("ai-med-context").value = name;
           document.getElementById("ai-section").scrollIntoView({ behavior: "smooth" });
         } else if (action === "add") {
-          openAddMedModal(name);
+          const fromSearch = Number.isInteger(idx) && idx >= 0 && idx < lastSearchResults.length
+            ? lastSearchResults[idx]
+            : null;
+          openAddMedModal(name, fromSearch);
         }
       });
     });
   } catch (e) {
+    lastSearchResults = [];
     showError("search-error", e.message || "Search failed. Check your connection or try again later.");
     resultsEl.innerHTML = "";
   }
@@ -591,17 +653,27 @@ function escapeHtml(s) {
 }
 
 // --- Add Med Modal ---
-function openAddMedModal(presetName = "") {
+function openAddMedModal(presetName = "", sourceMeta = null) {
   document.getElementById("add-med-name").value = presetName;
   document.getElementById("add-med-purpose").value = "";
   document.getElementById("add-med-stock").value = "10";
   document.getElementById("add-med-threshold").value = "5";
   document.getElementById("add-med-notes").value = "";
+  pendingAddMedMeta = sourceMeta
+    ? {
+        canonical_name: cleanOptionalStr(sourceMeta.canonical_name, 255),
+        image_url: cleanOptionalStr(sourceMeta.image_url, 1024),
+        imprint: cleanOptionalStr(sourceMeta.imprint, 255),
+        color: cleanOptionalStr(sourceMeta.color, 128),
+        shape: cleanOptionalStr(sourceMeta.shape, 128),
+      }
+    : null;
   document.getElementById("add-med-modal").classList.remove("hidden");
 }
 
 document.getElementById("add-med-cancel").addEventListener("click", () => {
   document.getElementById("add-med-modal").classList.add("hidden");
+  pendingAddMedMeta = null;
 });
 
 document.getElementById("add-med-form").addEventListener("submit", async (e) => {
@@ -615,11 +687,17 @@ document.getElementById("add-med-form").addEventListener("submit", async (e) => 
         name,
         purpose: document.getElementById("add-med-purpose").value.trim() || null,
         dosage_notes: document.getElementById("add-med-notes").value.trim() || null,
+        canonical_name: pendingAddMedMeta?.canonical_name || null,
+        image_url: pendingAddMedMeta?.image_url || null,
+        imprint: pendingAddMedMeta?.imprint || null,
+        color: pendingAddMedMeta?.color || null,
+        shape: pendingAddMedMeta?.shape || null,
         stock_count: parseInt(document.getElementById("add-med-stock").value, 10) || 0,
         low_stock_threshold: parseInt(document.getElementById("add-med-threshold").value, 10) || 5,
       }),
     });
     document.getElementById("add-med-modal").classList.add("hidden");
+    pendingAddMedMeta = null;
     loadPillbox();
   } catch (err) {
     showError("pillbox-error", err.message);
@@ -699,6 +777,12 @@ async function loadPillbox() {
     listEl.innerHTML = meds.map((m) => {
       const isLow = m.stock_count <= m.low_stock_threshold;
       const stockClass = isLow ? "stock-info low" : "stock-info";
+      const imageUrl = m.image_url || MED_PLACEHOLDER_IMAGE;
+      const appearanceItems = [
+        m.imprint ? `Imprint: ${escapeHtml(m.imprint)}` : null,
+        m.color ? `Color: ${escapeHtml(m.color)}` : null,
+        m.shape ? `Shape: ${escapeHtml(m.shape)}` : null,
+      ].filter(Boolean);
       const schedulesHtml = (m.schedules || []).map((s) => `
         <div class="schedule-item">
           <span class="schedule-time">${escapeHtml(s.time_of_day)} ${s.days_of_week}</span>
@@ -710,8 +794,15 @@ async function loadPillbox() {
       `).join("");
       return `
         <div class="pillbox-card" data-med-id="${m.id}">
-          <h4>${escapeHtml(m.name)}</h4>
+          <div class="med-card-top">
+            <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(m.name)}" class="med-thumb" loading="lazy" onerror="this.onerror=null;this.src='${MED_PLACEHOLDER_IMAGE}'">
+            <div class="med-main">
+              <h4>${escapeHtml(m.name)}</h4>
+              ${m.canonical_name ? `<p class="med-canonical">Standard: ${escapeHtml(m.canonical_name)}</p>` : ""}
+            </div>
+          </div>
           ${m.purpose ? `<p>Purpose: ${escapeHtml(m.purpose)}</p>` : ""}
+          ${appearanceItems.length ? `<p>${appearanceItems.join(" | ")}</p>` : ""}
           <p class="${stockClass}">Stock: ${m.stock_count} | Alert threshold: ${m.low_stock_threshold}</p>
           ${m.dosage_notes ? `<p>Notes: ${escapeHtml(m.dosage_notes)}</p>` : ""}
           <div class="schedule-list">
@@ -1116,6 +1207,12 @@ initClearableInput("ai-med-context", "ai-med-context-clear");
 populateStateSelect();
 
 (async () => {
+  const oauthUser = handleOAuthRedirectResult();
+  if (oauthUser) {
+    loadPillbox();
+    loadProfile();
+    return;
+  }
   const user = await checkAuth();
   updateAuthUI(user);
   if (user) {

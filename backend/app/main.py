@@ -4,9 +4,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
+from app.config import JWT_SECRET
 from app.routers import med_search, ai, pillbox, cron, notifications, auth, user_profile, weather
 
 
@@ -30,6 +32,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SessionMiddleware, secret_key=JWT_SECRET, same_site="lax", https_only=False)
 
 app.include_router(med_search.router)
 app.include_router(ai.router)

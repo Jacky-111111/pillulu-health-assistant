@@ -58,6 +58,21 @@ def _migrate_auth():
                     conn.commit()
             except Exception:
                 pass
+        for col, col_type in [
+            ("canonical_name", "VARCHAR(255)"),
+            ("image_url", "VARCHAR(1024)"),
+            ("imprint", "VARCHAR(255)"),
+            ("color", "VARCHAR(128)"),
+            ("shape", "VARCHAR(128)"),
+        ]:
+            try:
+                r = conn.execute(text("PRAGMA table_info(meds)"))
+                cols = [row[1] for row in r]
+                if col not in cols:
+                    conn.execute(text(f"ALTER TABLE meds ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+            except Exception:
+                pass
 
     db = SessionLocal()
     try:

@@ -14,6 +14,11 @@ class MedSearchResult(BaseModel):
     substance_name: Optional[str] = None
     warnings_snippet: Optional[str] = None
     display_name: Optional[str] = None  # Best available name (from openfda or fallback fields)
+    canonical_name: Optional[str] = None
+    image_url: Optional[str] = None
+    imprint: Optional[str] = None
+    color: Optional[str] = None
+    shape: Optional[str] = None
 
 
 # --- AI Ask ---
@@ -33,6 +38,11 @@ class MedCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     purpose: Optional[str] = Field(None, max_length=500)
     dosage_notes: Optional[str] = Field(None, max_length=2000)
+    canonical_name: Optional[str] = Field(None, max_length=255)
+    image_url: Optional[str] = Field(None, max_length=1024)
+    imprint: Optional[str] = Field(None, max_length=255)
+    color: Optional[str] = Field(None, max_length=128)
+    shape: Optional[str] = Field(None, max_length=128)
     stock_count: int = Field(default=0, ge=0)
     low_stock_threshold: int = Field(default=5, ge=0)
 
@@ -42,6 +52,11 @@ class MedUpdate(BaseModel):
     purpose: Optional[str] = Field(None, max_length=500)
     dosage_notes: Optional[str] = Field(None, max_length=2000)
     adult_dosage_guidance: Optional[str] = Field(None, max_length=2000)
+    canonical_name: Optional[str] = Field(None, max_length=255)
+    image_url: Optional[str] = Field(None, max_length=1024)
+    imprint: Optional[str] = Field(None, max_length=255)
+    color: Optional[str] = Field(None, max_length=128)
+    shape: Optional[str] = Field(None, max_length=128)
     stock_count: Optional[int] = Field(None, ge=0)
     low_stock_threshold: Optional[int] = Field(None, ge=0)
 
@@ -64,6 +79,11 @@ class MedResponse(BaseModel):
     purpose: Optional[str] = None
     dosage_notes: Optional[str] = None
     adult_dosage_guidance: Optional[str] = None
+    canonical_name: Optional[str] = None
+    image_url: Optional[str] = None
+    imprint: Optional[str] = None
+    color: Optional[str] = None
+    shape: Optional[str] = None
     stock_count: int
     low_stock_threshold: int
     created_at: datetime

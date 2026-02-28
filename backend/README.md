@@ -20,6 +20,17 @@ FROM_EMAIL=your-verified-sender@domain.com
 APP_BASE_URL=https://your-username.github.io/pillulu-health-assistant/
 DATABASE_PATH=./data/pillulu.db
 CRON_SECRET=your-random-secret-for-cron
+JWT_SECRET=your-random-secret-for-auth-tokens
+
+# OAuth / OIDC (optional)
+OAUTH_FRONTEND_BASE_URL=http://localhost:8080
+OAUTH_BACKEND_BASE_URL=http://127.0.0.1:8000
+GOOGLE_OIDC_DISCOVERY_URL=https://accounts.google.com/.well-known/openid-configuration
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+CMU_OIDC_DISCOVERY_URL=...
+CMU_CLIENT_ID=...
+CMU_CLIENT_SECRET=...
 ```
 
 Optional: `backend/secrets.txt` (one per line: `KEY=value`) as fallback when env vars are empty.
@@ -54,6 +65,8 @@ Health check: http://127.0.0.1:8000/health
 | PUT | `/api/notifications/read-all` | Mark all read |
 | POST | `/api/cron/send_reminders` | Cron: create notifications (requires CRON_SECRET) |
 | POST | `/api/cron/decrement_stock` | Cron: decrement stock (optional) |
+| GET | `/api/auth/oauth/google/start` | Start Google OAuth login |
+| GET | `/api/auth/oauth/cmu/start` | Start CMU OAuth login |
 
 ## Environment Variables
 
@@ -65,6 +78,13 @@ Health check: http://127.0.0.1:8000/health
 | APP_BASE_URL | Optional | Frontend URL |
 | DATABASE_PATH | Optional | Default: ./data/pillulu.db |
 | CRON_SECRET | For cron | Secret for cron endpoints |
+| JWT_SECRET | Recommended | Secret for auth token and session signing |
+| OAUTH_FRONTEND_BASE_URL | Optional | Frontend URL for OAuth callback redirect |
+| OAUTH_BACKEND_BASE_URL | Optional | Backend base URL to build OAuth callback URL |
+| GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET | Optional | Enable Google login when both provided |
+| GOOGLE_OIDC_DISCOVERY_URL | Optional | Defaults to Google official discovery URL |
+| CMU_CLIENT_ID / CMU_CLIENT_SECRET | Optional | Enable CMU login when both provided |
+| CMU_OIDC_DISCOVERY_URL | Optional | CMU official OIDC discovery URL |
 
 ## Render Deployment (Merged: frontend + backend in one service)
 
