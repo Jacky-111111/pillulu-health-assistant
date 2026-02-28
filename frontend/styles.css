@@ -75,9 +75,19 @@ body {
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-size: 1.35rem;
   margin: 0 0 0.15rem 0;
   font-weight: 700;
+}
+
+.logo-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  display: inline-block;
 }
 
 /* Login modal */
@@ -469,7 +479,11 @@ label {
   flex-shrink: 0;
 }
 
-.search-box input {
+.search-box .input-with-clear {
+  flex: 1;
+}
+
+.search-box .input-with-clear input {
   flex: 1;
   margin-bottom: 0;
   padding: 0.5rem 0.75rem;
@@ -509,6 +523,50 @@ label {
   color: var(--error);
   border-color: var(--error);
   background: #fde8e8;
+}
+
+.input-with-clear {
+  position: relative;
+  width: 100%;
+}
+
+.input-with-clear input {
+  padding-right: 2rem;
+}
+
+.input-with-clear textarea {
+  padding-right: 2rem;
+  margin-bottom: 0;
+}
+
+.input-clear-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.45rem;
+  transform: translateY(-50%);
+  width: 1.4rem;
+  height: 1.4rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(27, 73, 101, 0.12);
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input-with-clear textarea + .input-clear-btn {
+  top: 0.7rem;
+  transform: none;
+}
+
+.input-clear-btn:hover {
+  background: rgba(27, 73, 101, 0.2);
+  color: var(--primary);
 }
 
 .results-grid {

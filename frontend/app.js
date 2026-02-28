@@ -26,6 +26,25 @@ function showSuccess(containerId) {
   setTimeout(() => el.classList.add("hidden"), 3000);
 }
 
+function initClearableInput(inputId, clearBtnId) {
+  const inputEl = document.getElementById(inputId);
+  const clearBtnEl = document.getElementById(clearBtnId);
+  if (!inputEl || !clearBtnEl) return;
+
+  const syncVisibility = () => {
+    clearBtnEl.classList.toggle("hidden", !inputEl.value);
+  };
+
+  inputEl.addEventListener("input", syncVisibility);
+  clearBtnEl.addEventListener("click", () => {
+    inputEl.value = "";
+    inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+    inputEl.focus();
+    if (inputId === "search-input") hideError("search-error");
+  });
+  syncVisibility();
+}
+
 const AUTH_TOKEN_KEY = "pillulu_token";
 
 function getAuthToken() {
@@ -1090,6 +1109,10 @@ function startNotificationPolling() {
 }
 
 // --- Init ---
+initClearableInput("search-input", "search-input-clear");
+initClearableInput("ai-question", "ai-question-clear");
+initClearableInput("ai-med-context", "ai-med-context-clear");
+
 populateStateSelect();
 
 (async () => {

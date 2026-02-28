@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pillulu Health Assistant - My Pillbox</title>
+  <title>Pillulu Health Assistant | Your Smart Pillbox</title>
   <link rel="icon" href="icons8-pill-80.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -11,8 +11,11 @@
   <!-- Header + Disclaimer -->
   <header class="header">
     <div class="header-left">
-      <h1 class="logo">💊 Pillulu Health Assistant</h1>
-      <p class="tagline">Manage your medications and take them on time</p>
+      <h1 class="logo">
+        <img src="icons8-pill-80.png" alt="" class="logo-icon">
+        <span>Pillulu Health Assistant</span>
+      </h1>
+      <p class="tagline">Your AI medication copilot for smarter reminders and safer routines</p>
     </div>
     <div class="header-right">
       <span id="user-email" class="user-email hidden"></span>
@@ -57,7 +60,7 @@
         </div>
         <p class="weather-attribution">Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
       </section>
-      <footer class="page-footer">Jack Yu © 2026. Built with help of Cursor.</footer>
+      <footer class="page-footer">Jack Yu © 2026.<br>Built with help of Cursor.</footer>
     </aside>
 
     <main class="main">
@@ -66,7 +69,10 @@
       <h2>🔍 Search Medications</h2>
       <p class="section-desc">Tip: Search by specific drug name (e.g. ibuprofen, amoxicillin) for best results. Info from OpenFDA.</p>
       <div class="search-box">
-        <input type="text" id="search-input" placeholder="Enter medication name, e.g. ibuprofen, amoxicillin" maxlength="100" aria-label="Search medications">
+        <div class="input-with-clear">
+          <input type="text" id="search-input" placeholder="Enter medication name, e.g. ibuprofen, amoxicillin" maxlength="100" aria-label="Search medications">
+          <button type="button" id="search-input-clear" class="input-clear-btn hidden" aria-label="Clear medication search">×</button>
+        </div>
         <button type="button" id="search-btn" class="btn btn-primary">Search</button>
         <button type="button" id="scan-btn" class="btn btn-secondary">Scan Label</button>
       </div>
@@ -80,9 +86,15 @@
       <p class="section-desc">Ask about medication info, dosage, etc. (For reference only—consult your doctor)</p>
       <div class="ai-form">
         <label for="ai-question">Your question:</label>
-        <textarea id="ai-question" rows="3" placeholder="e.g. What is the typical adult dosage for ibuprofen?" maxlength="2000" aria-label="Enter question"></textarea>
+        <div class="input-with-clear">
+          <textarea id="ai-question" rows="3" placeholder="e.g. What is the typical adult dosage for ibuprofen?" maxlength="2000" aria-label="Enter question"></textarea>
+          <button type="button" id="ai-question-clear" class="input-clear-btn hidden" aria-label="Clear AI question">×</button>
+        </div>
         <label for="ai-med-context">Related medication (optional):</label>
-        <input type="text" id="ai-med-context" placeholder="Medication name" maxlength="255" aria-label="Related medication">
+        <div class="input-with-clear">
+          <input type="text" id="ai-med-context" placeholder="Medication name" maxlength="255" aria-label="Related medication">
+          <button type="button" id="ai-med-context-clear" class="input-clear-btn hidden" aria-label="Clear related medication">×</button>
+        </div>
         <button type="button" id="ai-ask-btn" class="btn btn-primary">Ask</button>
       </div>
       <div id="ai-answer" class="ai-answer hidden">
