@@ -359,6 +359,157 @@ document.getElementById("search-btn").addEventListener("click", doSearch);
 document.getElementById("search-input").addEventListener("keypress", (e) => {
   if (e.key === "Enter") doSearch();
 });
+document.getElementById("scan-btn").addEventListener("click", openScanModal);
+document.getElementById("scan-cancel").addEventListener("click", closeScanModal);
+document.getElementById("scan-capture").addEventListener("click", captureAndDetectFromCamera);
+document.getElementById("scan-modal").addEventListener("click", (e) => {
+  if (e.target.id === "scan-modal") closeScanModal();
+});
+
+let scanStream = null;
+let scanInProgress = false;
+
+const OCR_IGNORE_WORDS = new Set([
+  "TABLET", "TABLETS", "CAPSULE", "CAPSULES", "SOFTGEL", "SOFTGELS", "SOLUTION",
+  "INJECTION", "TOPICAL", "ORAL", "USP", "NDC", "LOT", "EXP", "RX", "ONLY",
+  "MG", "MCG", "ML", "GRAM", "G", "FOR", "THE", "AND", "WITH", "PAIN", "RELIEF",
+]);
+
+function updateScanStatus(message, isError = false) {
+  const statusEl = document.getElementById("scan-status");
+  statusEl.textContent = message;
+  statusEl.classList.toggle("error", !!isError);
+}
+
+function stopScanCamera() {
+  if (!scanStream) return;
+  scanStream.getTracks().forEach((track) => track.stop());
+  scanStream = null;
+  const videoEl = document.getElementById("scan-video");
+  videoEl.srcObject = null;
+}
+
+async function openScanModal() {
+  hideError("search-error");
+  stopScanCamera();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showError("search-error", "Camera is not supported in this browser.");
+    return;
+  }
+
+  document.getElementById("scan-modal").classList.remove("hidden");
+  updateScanStatus("Starting camera...");
+
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+    const videoEl = document.getElementById("scan-video");
+    videoEl.srcObject = scanStream;
+    await videoEl.play();
+    updateScanStatus("Camera ready. Hold label steady and tap Capture & Detect.");
+  } catch {
+    updateScanStatus("Unable to access camera. Check browser permissions.", true);
+    showError("search-error", "Unable to access camera. Please allow camera permission.");
+  }
+}
+
+function closeScanModal(force = false) {
+  if (scanInProgress && !force) return;
+  stopScanCamera();
+  document.getElementById("scan-modal").classList.add("hidden");
+  updateScanStatus("Camera not started");
+}
+
+function extractMedicationCandidate(rawText) {
+  if (!rawText) return "";
+  const cleanedLines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[^A-Za-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim())
+    .filter((line) => line.length >= 4);
+
+  const candidates = [];
+  for (const line of cleanedLines) {
+    const upper = line.toUpperCase();
+    if (/\b(NDC|LOT|EXP)\b/.test(upper)) continue;
+    if (/\b\d+(\.\d+)?\s?(MG|MCG|ML|G)\b/.test(upper) && upper.split(" ").length <= 2) continue;
+
+    const words = upper
+      .split(" ")
+      .filter((w) => /^[A-Z-]{3,}$/.test(w) && !OCR_IGNORE_WORDS.has(w));
+    if (words.length === 0) continue;
+
+    const oneWord = words[0];
+    const twoWord = words.length >= 2 ? `${words[0]} ${words[1]}` : words[0];
+    const score = Math.max(oneWord.length, twoWord.length) + words.length;
+    candidates.push({ oneWord, twoWord, score });
+  }
+
+  if (candidates.length === 0) return "";
+  candidates.sort((a, b) => b.score - a.score);
+  const best = candidates[0];
+  return best.twoWord.length <= 28 ? best.twoWord : best.oneWord;
+}
+
+function toDisplayMedicationName(name) {
+  return name
+    .toLowerCase()
+    .split(" ")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
+
+async function captureAndDetectFromCamera() {
+  if (scanInProgress) return;
+
+  const videoEl = document.getElementById("scan-video");
+  const canvasEl = document.getElementById("scan-canvas");
+  const captureBtn = document.getElementById("scan-capture");
+  if (!videoEl.videoWidth || !videoEl.videoHeight) {
+    updateScanStatus("Camera not ready. Please wait a moment and retry.", true);
+    return;
+  }
+
+  if (!window.Tesseract || typeof window.Tesseract.recognize !== "function") {
+    updateScanStatus("OCR library failed to load. Refresh and try again.", true);
+    return;
+  }
+
+  scanInProgress = true;
+  captureBtn.disabled = true;
+  captureBtn.textContent = "Detecting...";
+  updateScanStatus("Running OCR... this can take a few seconds.");
+
+  try {
+    canvasEl.width = videoEl.videoWidth;
+    canvasEl.height = videoEl.videoHeight;
+    const ctx = canvasEl.getContext("2d");
+    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+
+    const result = await window.Tesseract.recognize(canvasEl, "eng");
+    const text = result?.data?.text || "";
+    const candidate = extractMedicationCandidate(text);
+
+    if (!candidate) {
+      updateScanStatus("No medication name detected. Try better lighting or move closer.", true);
+      return;
+    }
+
+    const displayName = toDisplayMedicationName(candidate);
+    document.getElementById("search-input").value = displayName;
+    closeScanModal(true);
+    doSearch();
+  } catch {
+    updateScanStatus("OCR failed. Please try again.", true);
+  } finally {
+    scanInProgress = false;
+    captureBtn.disabled = false;
+    captureBtn.textContent = "Capture & Detect";
+  }
+}
+
+window.addEventListener("beforeunload", stopScanCamera);
 
 async function doSearch() {
   const input = document.getElementById("search-input");

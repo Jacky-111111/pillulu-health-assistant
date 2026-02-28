@@ -476,6 +476,41 @@ label {
   font-size: 0.95rem;
 }
 
+#scan-btn {
+  white-space: nowrap;
+}
+
+.scan-video-wrap {
+  width: 100%;
+  border: 2px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+  margin-bottom: 0.75rem;
+}
+
+#scan-video {
+  width: 100%;
+  display: block;
+  min-height: 220px;
+  object-fit: cover;
+}
+
+.scan-status {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.scan-status.error {
+  color: var(--error);
+  border-color: var(--error);
+  background: #fde8e8;
+}
+
 .results-grid {
   display: grid;
   gap: 0.5rem;

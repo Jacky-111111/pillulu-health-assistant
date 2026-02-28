@@ -68,6 +68,7 @@
       <div class="search-box">
         <input type="text" id="search-input" placeholder="Enter medication name, e.g. ibuprofen, amoxicillin" maxlength="100" aria-label="Search medications">
         <button type="button" id="search-btn" class="btn btn-primary">Search</button>
+        <button type="button" id="scan-btn" class="btn btn-secondary">Scan Label</button>
       </div>
       <div id="search-results" class="results-grid"></div>
       <div id="search-error" class="error-banner hidden"></div>
@@ -117,6 +118,23 @@
       <div id="notifications-empty" class="empty-state hidden">No notifications yet</div>
     </section>
   </main>
+  </div>
+
+  <!-- Modal for Camera Scan -->
+  <div id="scan-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Scan Medication Label</h3>
+      <p class="section-desc">Point the camera at the medication name, then tap "Capture & Detect".</p>
+      <div class="scan-video-wrap">
+        <video id="scan-video" autoplay playsinline muted></video>
+      </div>
+      <canvas id="scan-canvas" class="hidden"></canvas>
+      <div id="scan-status" class="scan-status">Camera not started</div>
+      <div class="modal-actions">
+        <button type="button" id="scan-cancel" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="scan-capture" class="btn btn-primary">Capture & Detect</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal for Edit Profile -->
@@ -272,6 +290,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
