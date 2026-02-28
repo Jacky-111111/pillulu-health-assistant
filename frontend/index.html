@@ -57,6 +57,7 @@
         </div>
         <p class="weather-attribution">Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
       </section>
+      <footer class="page-footer">Jack Yu © 2026. Built with help of Cursor.</footer>
     </aside>
 
     <main class="main">
@@ -164,6 +165,14 @@
         <input type="email" id="register-email" placeholder="your@email.com">
         <label for="register-password">Choose Password:</label>
         <input type="password" id="register-password" placeholder="At least 6 characters">
+        <label for="register-terms" class="terms-check">
+          <input type="checkbox" id="register-terms">
+          <span>
+            I have read and agree to the
+            <a href="terms.html" target="_blank" rel="noopener" class="terms-link">Terms of Educational Use and Privacy Notice</a>.
+            I understand that Pillulu Health Assistant is for reference only and does not replace professional medical advice.
+          </span>
+        </label>
         <button type="button" id="register-submit" class="btn btn-success">Create Account</button>
       </div>
       <button type="button" id="login-modal-close" class="modal-close">×</button>
@@ -263,7 +272,6 @@
     </div>
   </div>
 
-  <footer class="page-footer">Jack Yu © 2026. Built with help of Cursor.</footer>
   <script src="app.js"></script>
 </body>
 </html>

@@ -121,12 +121,17 @@ document.getElementById("login-submit").addEventListener("click", async () => {
 document.getElementById("register-submit").addEventListener("click", async () => {
   const email = document.getElementById("register-email").value.trim();
   const password = document.getElementById("register-password").value;
+  const acceptedTerms = document.getElementById("register-terms").checked;
   if (!email || !password) {
     alert("Please enter email and password.");
     return;
   }
   if (password.length < 6) {
     alert("Password must be at least 6 characters.");
+    return;
+  }
+  if (!acceptedTerms) {
+    alert("Please accept the educational-use terms before creating an account.");
     return;
   }
   try {
@@ -139,6 +144,7 @@ document.getElementById("register-submit").addEventListener("click", async () =>
     document.getElementById("login-modal").classList.add("hidden");
     document.getElementById("register-email").value = "";
     document.getElementById("register-password").value = "";
+    document.getElementById("register-terms").checked = false;
     loadPillbox();
     loadProfile();
   } catch (err) {

@@ -98,6 +98,62 @@ body {
   font-weight: 500;
 }
 
+/* Force consistent auth input appearance across browsers (esp. password in Safari/WebKit). */
+#login-email,
+#login-password,
+#register-email,
+#register-password {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  border: 2px solid var(--card-border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background: var(--white);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#login-email:focus,
+#login-password:focus,
+#register-email:focus,
+#register-password:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(27, 73, 101, 0.2);
+}
+
+.terms-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.25rem 0 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #f7fcff;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.terms-check input {
+  width: auto;
+  margin: 0.15rem 0 0 0;
+  flex-shrink: 0;
+}
+
+.terms-link {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.terms-link:hover {
+  color: var(--accent);
+}
+
 .login-divider {
   margin: 0.5rem 0;
   font-weight: 600;
@@ -156,6 +212,8 @@ body {
   border-right: 2px solid var(--card-border);
   padding: 1rem;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .profile-section {
@@ -369,6 +427,7 @@ body {
 /* Inputs */
 input[type="text"],
 input[type="email"],
+input[type="password"],
 input[type="number"],
 input[type="time"],
 select,
@@ -833,11 +892,11 @@ label {
   }
 }
 
-/* Footer - bottom right */
+/* Footer - sidebar bottom */
 .page-footer {
-  position: fixed;
-  bottom: 0.5rem;
-  right: 0.75rem;
-  font-size: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
   color: var(--text-muted);
 }
