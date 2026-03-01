@@ -63,6 +63,86 @@
       <footer class="page-footer">Jack Yu © 2026.<br>Built with help of Cursor.</footer>
     </aside>
 
+    <aside class="body-panel">
+      <section class="section body-map-section">
+        <h2>🧍 Body Insight</h2>
+        <p class="section-desc">Past cases are highlighted on body parts.</p>
+        <div class="body-map-stage">
+          <svg id="body-map-svg" class="body-map-svg" viewBox="0 0 220 460" role="img" aria-label="2D body map">
+            <defs>
+              <linearGradient id="bodyGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#cae9ff"/>
+                <stop offset="100%" stop-color="#9fd9ef"/>
+              </linearGradient>
+            </defs>
+            <circle cx="110" cy="40" r="26" class="body-shape part-hotspot" data-body-part="head"></circle>
+            <rect x="78" y="70" width="64" height="112" rx="28" class="body-shape part-hotspot" data-body-part="chest"></rect>
+            <rect x="82" y="176" width="56" height="64" rx="20" class="body-shape part-hotspot" data-body-part="abdomen"></rect>
+            <rect x="42" y="84" width="26" height="104" rx="12" class="body-shape part-hotspot" data-body-part="left_arm"></rect>
+            <rect x="152" y="84" width="26" height="104" rx="12" class="body-shape part-hotspot" data-body-part="right_arm"></rect>
+            <rect x="84" y="238" width="24" height="118" rx="12" class="body-shape part-hotspot" data-body-part="left_leg"></rect>
+            <rect x="112" y="238" width="24" height="118" rx="12" class="body-shape part-hotspot" data-body-part="right_leg"></rect>
+            <circle id="marker-head" class="body-marker hidden" data-body-part="head" cx="110" cy="40" r="8"></circle>
+            <circle id="marker-chest" class="body-marker hidden" data-body-part="chest" cx="110" cy="120" r="8"></circle>
+            <circle id="marker-abdomen" class="body-marker hidden" data-body-part="abdomen" cx="110" cy="204" r="8"></circle>
+            <circle id="marker-left_arm" class="body-marker hidden" data-body-part="left_arm" cx="55" cy="126" r="7"></circle>
+            <circle id="marker-right_arm" class="body-marker hidden" data-body-part="right_arm" cx="165" cy="126" r="7"></circle>
+            <circle id="marker-left_leg" class="body-marker hidden" data-body-part="left_leg" cx="95" cy="286" r="7"></circle>
+            <circle id="marker-right_leg" class="body-marker hidden" data-body-part="right_leg" cx="125" cy="286" r="7"></circle>
+          </svg>
+          <div id="body-part-tooltip" class="body-part-tooltip hidden"></div>
+        </div>
+        <div class="body-map-tools">
+          <button type="button" id="clear-body-filter-btn" class="btn btn-secondary btn-small">Show all parts</button>
+          <span id="active-body-filter" class="body-filter-label">Filter: all</span>
+        </div>
+      </section>
+
+      <section class="section case-history-section">
+        <h2>🩺 Past Cases</h2>
+        <div class="case-header-tools">
+          <button type="button" id="case-toggle-btn" class="btn btn-secondary btn-small hidden">Add case</button>
+          <span id="case-login-hint" class="case-login-hint">Log in to add case records.</span>
+        </div>
+        <form id="case-form" class="case-form hidden">
+          <label for="case-title">Case title *</label>
+          <input type="text" id="case-title" maxlength="255" placeholder="e.g. Migraine flare-up" required>
+          <label for="case-body-part">Body part *</label>
+          <select id="case-body-part" required>
+            <option value="">Select body part</option>
+            <option value="head">Head</option>
+            <option value="chest">Chest</option>
+            <option value="abdomen">Abdomen</option>
+            <option value="left_arm">Left arm</option>
+            <option value="right_arm">Right arm</option>
+            <option value="left_leg">Left leg</option>
+            <option value="right_leg">Right leg</option>
+          </select>
+          <label for="case-status">Status</label>
+          <select id="case-status">
+            <option value="active">Active</option>
+            <option value="resolved">Resolved</option>
+            <option value="chronic">Chronic</option>
+          </select>
+          <label for="case-severity">Severity (1-10)</label>
+          <input type="number" id="case-severity" min="1" max="10" value="3">
+          <label>Occurred on (YYYY-MM-DD)</label>
+          <div class="case-date-group">
+            <input type="text" id="case-date-year" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="YYYY" aria-label="Year">
+            <input type="text" id="case-date-month" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="MM" aria-label="Month">
+            <input type="text" id="case-date-day" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="DD" aria-label="Day">
+            <button type="button" id="case-date-today-btn" class="btn btn-secondary btn-small">Today</button>
+          </div>
+          <label for="case-notes">Notes (optional)</label>
+          <textarea id="case-notes" rows="2" maxlength="2000" placeholder="Symptoms, diagnosis, treatment response..."></textarea>
+          <button type="submit" class="btn btn-primary">Add case</button>
+        </form>
+        <div id="case-error" class="error-banner hidden"></div>
+        <div id="case-list" class="case-list"></div>
+        <div id="case-empty" class="empty-state hidden">No case records yet.</div>
+      </section>
+    </aside>
+
     <main class="main">
     <!-- 1. Search Medications -->
     <section class="section" id="search-section">
@@ -220,6 +300,18 @@
         <button type="button" id="register-submit" class="btn btn-success">Create Account</button>
       </div>
       <button type="button" id="login-modal-close" class="modal-close">×</button>
+    </div>
+  </div>
+
+  <!-- Modal for Add to Pillbox -->
+  <div id="med-detail-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="med-detail-title">Medication details</h3>
+      <div id="med-detail-content" class="med-detail-content"></div>
+      <div class="modal-actions">
+        <button type="button" id="med-detail-close" class="btn btn-secondary">Close</button>
+        <button type="button" id="med-detail-add" class="btn btn-primary">Add to Pillbox</button>
+      </div>
     </div>
   </div>
 

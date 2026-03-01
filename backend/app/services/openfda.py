@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from app.config import OPENAI_API_KEY
+from app.services.ai import get_general_use_summary
 from app.schemas import MedSearchResult
 
 OPENFDA_URL = "https://api.fda.gov/drug/label.json"
@@ -29,6 +31,22 @@ _SYNONYM_GROUPS = {
     "guaifenesin": ["mucinex"],
 }
 
+_GENERAL_USE_FALLBACKS = {
+    "ibuprofen": "Helps reduce pain, inflammation, and fever.",
+    "acetaminophen": "Helps reduce fever and mild to moderate pain.",
+    "naproxen": "Helps reduce pain, inflammation, and stiffness.",
+    "loratadine": "Relieves allergy symptoms such as sneezing, runny nose, and itchy eyes.",
+    "cetirizine": "Relieves allergy symptoms such as sneezing, runny nose, and itching.",
+    "fexofenadine": "Relieves seasonal allergy symptoms without strong drowsiness in many users.",
+    "diphenhydramine": "Relieves allergy symptoms and may also be used as a short-term sleep aid.",
+    "omeprazole": "Reduces stomach acid for frequent heartburn and reflux symptoms.",
+    "famotidine": "Reduces stomach acid for heartburn and acid indigestion.",
+    "loperamide": "Controls diarrhea by slowing bowel movement.",
+    "dextromethorphan": "Temporarily suppresses cough.",
+    "guaifenesin": "Helps loosen and thin mucus in the airways.",
+    "amoxicillin": "Antibiotic used to treat certain bacterial infections.",
+}
+
 _ALIAS_TO_CANONICAL: Dict[str, str] = {}
 for _canonical, _aliases in _SYNONYM_GROUPS.items():
     _ALIAS_TO_CANONICAL[_canonical] = _canonical
@@ -38,6 +56,8 @@ for _canonical, _aliases in _SYNONYM_GROUPS.items():
 _SUGGEST_CACHE: Dict[str, tuple[float, List[str]]] = {}
 _SUGGEST_CACHE_TTL_SECONDS = 180.0
 _SUGGEST_CACHE_MAX_ENTRIES = 400
+_AI_GENERAL_USE_CACHE: Dict[str, tuple[float, str]] = {}
+_AI_GENERAL_USE_CACHE_TTL_SECONDS = 24 * 3600.0
 
 
 def _normalize_name(value: str) -> str:
@@ -72,6 +92,51 @@ def _display_name(brand: Optional[str], generic: Optional[str], substance: Optio
     if substance:
         return substance.strip()
     return ""
+
+
+def _first_sentence(value: str, max_len: int = 300) -> str:
+    text = re.sub(r"\s+", " ", (value or "")).strip()
+    if not text:
+        return ""
+    m = re.search(r"(.+?[.!?])(\s|$)", text)
+    sentence = m.group(1).strip() if m else text
+    return sentence[:max_len]
+
+
+async def _ai_general_use_fallback(
+    display_name: str,
+    canonical_name: Optional[str],
+    generic_name: Optional[str],
+    substance_name: Optional[str],
+) -> Optional[str]:
+    if not OPENAI_API_KEY:
+        return None
+
+    cache_key = _normalize_name(canonical_name or generic_name or substance_name or display_name)
+    if not cache_key:
+        return None
+
+    now = time.time()
+    cached = _AI_GENERAL_USE_CACHE.get(cache_key)
+    if cached and now - cached[0] <= _AI_GENERAL_USE_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    try:
+        summary = await asyncio.wait_for(
+            asyncio.to_thread(
+                get_general_use_summary,
+                display_name,
+                canonical_name or generic_name or substance_name,
+            ),
+            timeout=4.0,
+        )
+        summary = _first_sentence(summary, max_len=220)
+        if not summary:
+            return None
+        _AI_GENERAL_USE_CACHE[cache_key] = (time.time(), summary)
+        return summary
+    except Exception:
+        return None
 
 
 def _candidate_attempts(term: str) -> List[Optional[int]]:
@@ -261,6 +326,8 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
     image_cache: Dict[str, Dict[str, Optional[str]]] = {}
     ndc_cache: Dict[str, Dict[str, Optional[str]]] = {}
     rxcui_cache: Dict[str, Optional[str]] = {}
+    ai_use_calls = 0
+    ai_use_call_cap = 2
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         query_variants = await _build_query_variants(q, client)
@@ -301,6 +368,24 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
 
                     warnings = item.get("warnings", [])
                     warnings_snippet = warnings[0][:300] if warnings else None
+                    use_snippet = None
+                    indications = item.get("indications_and_usage", [])
+                    purpose = item.get("purpose", [])
+                    if indications:
+                        use_snippet = _first_sentence(str(indications[0]), max_len=300)
+                    elif purpose:
+                        use_snippet = _first_sentence(str(purpose[0]), max_len=300)
+                    if not use_snippet:
+                        for candidate in [canonical_name, generic, substance, display_name]:
+                            key = _normalize_name(candidate or "")
+                            if key in _GENERAL_USE_FALLBACKS:
+                                use_snippet = _GENERAL_USE_FALLBACKS[key]
+                                break
+                    if not use_snippet and ai_use_calls < ai_use_call_cap:
+                        ai_summary = await _ai_general_use_fallback(display_name, canonical_name, generic, substance)
+                        if ai_summary:
+                            use_snippet = ai_summary
+                        ai_use_calls += 1
 
                     visual = {"image_url": None, "imprint": None, "color": None, "shape": None}
                     resolved_rxcui = rxcui or await _resolve_best_rxcui(
@@ -323,6 +408,7 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
                             manufacturer=manufacturer,
                             route=route,
                             substance_name=substance,
+                            use_snippet=use_snippet,
                             warnings_snippet=warnings_snippet,
                             display_name=display_name,
                             canonical_name=canonical_name,

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import init_db
 from app.config import JWT_SECRET
-from app.routers import med_search, ai, pillbox, cron, notifications, auth, user_profile, weather
+from app.routers import med_search, ai, pillbox, cron, notifications, auth, user_profile, weather, cases
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(cron.router)
 app.include_router(auth.router)
 app.include_router(user_profile.router)
 app.include_router(weather.router)
+app.include_router(cases.router)
 
 
 @app.get("/health")

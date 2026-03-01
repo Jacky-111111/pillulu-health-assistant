@@ -27,6 +27,17 @@ You must respond with valid JSON in this exact format:
 
 DISCLAIMER = "This information is for educational purposes only and does not constitute medical advice. Please consult a doctor or pharmacist for personalized guidance."
 
+GENERAL_USE_SYSTEM_PROMPT = """You are a medication information assistant.
+Task: Provide ONE concise sentence describing the common/general use of a medication.
+Rules:
+- Educational information only, no diagnosis or personalized advice
+- Do not include dosage instructions
+- 12-24 words preferred
+- Plain language, specific enough to be useful
+- Return plain text only (no JSON, no markdown, no bullets)
+If unsure, say: "Common use information is not clearly available."
+"""
+
 
 def _parse_ai_response(raw: str) -> tuple[str, list[str]]:
     """Parse AI response. Expects JSON with answer and suggested_medications."""
@@ -70,3 +81,29 @@ def ask_ai(question: str, context_med_name: str | None = None) -> tuple[str, str
     raw = response.choices[0].message.content or ""
     answer, suggested_medications = _parse_ai_response(raw)
     return answer, DISCLAIMER, suggested_medications
+
+
+def get_general_use_summary(med_name: str, canonical_name: str | None = None) -> str:
+    """
+    Generate a concise general-use sentence for a medication.
+    Returns plain text; raises on API/config errors.
+    """
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY is not configured")
+
+    context = med_name.strip()
+    if canonical_name and canonical_name.strip().lower() != med_name.strip().lower():
+        context = f"{med_name.strip()} (canonical: {canonical_name.strip()})"
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": GENERAL_USE_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Medication: {context}"},
+        ],
+        max_tokens=80,
+    )
+    text = (response.choices[0].message.content or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    return text[:220]

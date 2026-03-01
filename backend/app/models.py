@@ -21,6 +21,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     meds = relationship("Med", back_populates="user", cascade="all, delete-orphan")
+    case_records = relationship("CaseRecord", back_populates="user", cascade="all, delete-orphan")
 
 
 class Notification(Base):
@@ -69,3 +70,21 @@ class Schedule(Base):
     last_reminder_sent_at = Column(DateTime, nullable=True)  # dedupe time-to-take reminders
 
     med = relationship("Med", back_populates="schedules")
+
+
+class CaseRecord(Base):
+    __tablename__ = "case_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    diagnosis = Column(String(500), nullable=True)
+    body_part = Column(String(64), nullable=False, index=True)
+    severity = Column(Integer, default=1)
+    status = Column(String(32), default="active")  # "active" | "resolved" | "chronic"
+    occurred_on = Column(Date, nullable=True)
+    resolved_on = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="case_records")

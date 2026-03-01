@@ -172,6 +172,7 @@ document.getElementById("login-submit").addEventListener("click", async () => {
     document.getElementById("login-password").value = "";
     loadPillbox();
     loadProfile();
+    loadCases();
   } catch (err) {
     alert(err.message || "Login failed.");
   }
@@ -207,6 +208,7 @@ document.getElementById("register-submit").addEventListener("click", async () =>
     document.getElementById("register-terms").checked = false;
     loadPillbox();
     loadProfile();
+    loadCases();
   } catch (err) {
     alert(err.message || "Registration failed.");
   }
@@ -219,6 +221,7 @@ document.getElementById("logout-btn").addEventListener("click", () => {
   loadPillbox();
   updateProfileUI(null);
   loadWeather(null, null);
+  clearCaseStateForGuest();
 });
 
 // --- US States & Cities (for location selection) ---
@@ -415,9 +418,380 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
   }
 });
 
+// --- Case Records + Body Map ---
+const BODY_PART_LABELS = {
+  head: "Head",
+  chest: "Chest",
+  abdomen: "Abdomen",
+  left_arm: "Left arm",
+  right_arm: "Right arm",
+  left_leg: "Left leg",
+  right_leg: "Right leg",
+};
+
+let cachedCases = [];
+let activeBodyPartFilter = null;
+
+function getBodyPartLabel(bodyPart) {
+  return BODY_PART_LABELS[bodyPart] || bodyPart || "Unknown";
+}
+
+function formatCaseDate(dateStr) {
+  return dateStr || "N/A";
+}
+
+function getCasesForBodyPart(bodyPart) {
+  return (cachedCases || [])
+    .filter((item) => item.body_part === bodyPart)
+    .sort((a, b) => {
+      const ad = a.occurred_on || "";
+      const bd = b.occurred_on || "";
+      if (ad === bd) return 0;
+      return ad < bd ? 1 : -1;
+    });
+}
+
+function positionBodyTooltip(clientX, clientY) {
+  const stageEl = document.querySelector(".body-map-stage");
+  const tooltipEl = document.getElementById("body-part-tooltip");
+  if (!stageEl || !tooltipEl) return;
+  const rect = stageEl.getBoundingClientRect();
+  const tipRect = tooltipEl.getBoundingClientRect();
+  const offset = 14;
+  let left = clientX - rect.left + offset;
+  let top = clientY - rect.top + offset;
+  if (left + tipRect.width > rect.width - 4) left = rect.width - tipRect.width - 4;
+  if (top + tipRect.height > rect.height - 4) top = rect.height - tipRect.height - 4;
+  if (left < 4) left = 4;
+  if (top < 4) top = 4;
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top}px`;
+}
+
+function showBodyTooltip(bodyPart, clientX, clientY) {
+  const tooltipEl = document.getElementById("body-part-tooltip");
+  if (!tooltipEl || !bodyPart) return;
+  const cases = getCasesForBodyPart(bodyPart);
+  if (!cases.length) {
+    tooltipEl.classList.add("hidden");
+    return;
+  }
+  const itemsHtml = cases.slice(0, 4).map((item) => {
+    const status = item.status || "active";
+    const d = formatCaseDate(item.occurred_on);
+    return `<p class="tooltip-item">• ${escapeHtml(item.title || "Untitled")} · ${escapeHtml(d)} · S${item.severity || 1} · ${escapeHtml(status)}</p>`;
+  }).join("");
+  const moreCount = cases.length - 4;
+  tooltipEl.innerHTML = `
+    <p class="tooltip-title">${escapeHtml(getBodyPartLabel(bodyPart))} (${cases.length})</p>
+    ${itemsHtml}
+    ${moreCount > 0 ? `<p class="tooltip-item">+${moreCount} more...</p>` : ""}
+  `;
+  tooltipEl.classList.remove("hidden");
+  positionBodyTooltip(clientX, clientY);
+}
+
+function hideBodyTooltip() {
+  const tooltipEl = document.getElementById("body-part-tooltip");
+  if (!tooltipEl) return;
+  tooltipEl.classList.add("hidden");
+}
+
+function buildCaseDateFromInputs() {
+  const yRaw = (document.getElementById("case-date-year")?.value || "").trim();
+  const mRaw = (document.getElementById("case-date-month")?.value || "").trim();
+  const dRaw = (document.getElementById("case-date-day")?.value || "").trim();
+  if (!yRaw && !mRaw && !dRaw) return null;
+  if (!yRaw || !mRaw || !dRaw) return "__INVALID_PARTIAL__";
+  if (!/^\d{4}$/.test(yRaw)) return "__INVALID_FORMAT__";
+  if (!/^\d{1,2}$/.test(mRaw) || !/^\d{1,2}$/.test(dRaw)) return "__INVALID_FORMAT__";
+
+  const year = parseInt(yRaw, 10);
+  const month = parseInt(mRaw, 10);
+  const day = parseInt(dRaw, 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "__INVALID_RANGE__";
+
+  const dateObj = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dateObj.getUTCFullYear() !== year
+    || dateObj.getUTCMonth() !== month - 1
+    || dateObj.getUTCDate() !== day
+  ) {
+    return "__INVALID_DATE__";
+  }
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function fillCaseDateInputsFromISO(isoDate) {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return;
+  const [y, m, d] = isoDate.split("-");
+  const yearEl = document.getElementById("case-date-year");
+  const monthEl = document.getElementById("case-date-month");
+  const dayEl = document.getElementById("case-date-day");
+  if (yearEl) yearEl.value = y;
+  if (monthEl) monthEl.value = String(parseInt(m, 10));
+  if (dayEl) dayEl.value = String(parseInt(d, 10));
+}
+
+function updateBodyFilterLabel() {
+  const labelEl = document.getElementById("active-body-filter");
+  if (!labelEl) return;
+  labelEl.textContent = activeBodyPartFilter
+    ? `Filter: ${getBodyPartLabel(activeBodyPartFilter)}`
+    : "Filter: all";
+}
+
+function highlightBodyHotspot() {
+  document.querySelectorAll(".part-hotspot[data-body-part]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.bodyPart === activeBodyPartFilter);
+  });
+}
+
+function renderBodyMarkers() {
+  const markers = document.querySelectorAll(".body-marker[id^='marker-']");
+  markers.forEach((marker) => {
+    marker.classList.add("hidden");
+    marker.classList.remove("resolved", "chronic");
+  });
+  if (!cachedCases.length) return;
+
+  const byPart = new Map();
+  for (const item of cachedCases) {
+    if (!item?.body_part) continue;
+    const state = byPart.get(item.body_part) || { status: "resolved" };
+    if (item.status === "active") {
+      state.status = "active";
+    } else if (item.status === "chronic" && state.status !== "active") {
+      state.status = "chronic";
+    }
+    byPart.set(item.body_part, state);
+  }
+
+  byPart.forEach((state, part) => {
+    const marker = document.getElementById(`marker-${part}`);
+    if (!marker) return;
+    marker.classList.remove("hidden");
+    if (state.status === "resolved") marker.classList.add("resolved");
+    if (state.status === "chronic") marker.classList.add("chronic");
+  });
+}
+
+function renderCaseList() {
+  const listEl = document.getElementById("case-list");
+  const emptyEl = document.getElementById("case-empty");
+  const toggleBtn = document.getElementById("case-toggle-btn");
+  const loginHint = document.getElementById("case-login-hint");
+  const formEl = document.getElementById("case-form");
+  if (!listEl || !emptyEl) return;
+
+  if (!getAuthToken()) {
+    if (toggleBtn) toggleBtn.classList.add("hidden");
+    if (loginHint) loginHint.classList.remove("hidden");
+    if (formEl) formEl.classList.add("hidden");
+    listEl.innerHTML = '<p class="empty-state">Please log in to manage case records.</p>';
+    emptyEl.classList.add("hidden");
+    return;
+  }
+  if (toggleBtn) toggleBtn.classList.remove("hidden");
+  if (loginHint) loginHint.classList.add("hidden");
+
+  const shown = activeBodyPartFilter
+    ? cachedCases.filter((c) => c.body_part === activeBodyPartFilter)
+    : cachedCases.slice();
+
+  if (!shown.length) {
+    listEl.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+  listEl.innerHTML = shown.map((item) => {
+    const status = item.status || "active";
+    const diagnosis = item.diagnosis ? ` · ${escapeHtml(item.diagnosis)}` : "";
+    return `
+      <article class="case-row">
+        <div class="case-row-main">
+          <p class="case-row-title">${escapeHtml(item.title || "Untitled case")}</p>
+          <span class="case-status-pill ${escapeHtml(status)}">${escapeHtml(status)}</span>
+          <p class="case-row-meta">${escapeHtml(getBodyPartLabel(item.body_part))}</p>
+          <p class="case-row-meta">S${item.severity || 1}</p>
+          <p class="case-row-meta">${escapeHtml(formatCaseDate(item.occurred_on))}</p>
+          ${item.diagnosis ? `<p class="case-row-meta">${escapeHtml(item.diagnosis)}</p>` : ""}
+          ${item.notes ? `<p class="case-row-meta">${escapeHtml(item.notes)}</p>` : ""}
+        </div>
+        <div class="case-item-actions">
+          <button type="button" class="btn btn-secondary btn-small" data-del-case="${item.id}">Delete</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  listEl.querySelectorAll("[data-del-case]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const caseId = parseInt(btn.dataset.delCase, 10);
+      if (!Number.isInteger(caseId)) return;
+      if (!confirm("Delete this case record?")) return;
+      try {
+        await fetchApi(`/api/cases/${caseId}`, { method: "DELETE" });
+        loadCases();
+      } catch (err) {
+        showError("case-error", err.message || "Failed to delete case.");
+      }
+    });
+  });
+}
+
+function clearCaseStateForGuest() {
+  cachedCases = [];
+  activeBodyPartFilter = null;
+  hideError("case-error");
+  const formEl = document.getElementById("case-form");
+  const toggleBtn = document.getElementById("case-toggle-btn");
+  if (formEl) formEl.classList.add("hidden");
+  if (toggleBtn) toggleBtn.textContent = "Add case";
+  updateBodyFilterLabel();
+  highlightBodyHotspot();
+  renderBodyMarkers();
+  renderCaseList();
+}
+
+function setBodyPartFilter(bodyPart) {
+  activeBodyPartFilter = bodyPart || null;
+  hideBodyTooltip();
+  updateBodyFilterLabel();
+  highlightBodyHotspot();
+  renderCaseList();
+}
+
+async function loadCases() {
+  if (!getAuthToken()) {
+    clearCaseStateForGuest();
+    return;
+  }
+  hideError("case-error");
+  try {
+    const items = await fetchApi("/api/cases");
+    cachedCases = items || [];
+    renderBodyMarkers();
+    renderCaseList();
+    updateBodyFilterLabel();
+    highlightBodyHotspot();
+  } catch (err) {
+    cachedCases = [];
+    renderBodyMarkers();
+    renderCaseList();
+    showError("case-error", err.message || "Failed to load case records.");
+  }
+}
+
+document.querySelectorAll("[data-body-part].part-hotspot, [data-body-part].body-marker").forEach((partEl) => {
+  partEl.addEventListener("click", () => {
+    const next = partEl.dataset.bodyPart;
+    setBodyPartFilter(activeBodyPartFilter === next ? null : next);
+  });
+  partEl.addEventListener("mouseenter", (ev) => {
+    showBodyTooltip(partEl.dataset.bodyPart, ev.clientX, ev.clientY);
+  });
+  partEl.addEventListener("mousemove", (ev) => {
+    const tooltipEl = document.getElementById("body-part-tooltip");
+    if (tooltipEl && !tooltipEl.classList.contains("hidden")) {
+      positionBodyTooltip(ev.clientX, ev.clientY);
+    } else {
+      showBodyTooltip(partEl.dataset.bodyPart, ev.clientX, ev.clientY);
+    }
+  });
+  partEl.addEventListener("mouseleave", hideBodyTooltip);
+});
+
+document.getElementById("clear-body-filter-btn")?.addEventListener("click", () => {
+  setBodyPartFilter(null);
+});
+
+document.getElementById("case-toggle-btn")?.addEventListener("click", () => {
+  const formEl = document.getElementById("case-form");
+  const toggleBtn = document.getElementById("case-toggle-btn");
+  if (!formEl || !toggleBtn) return;
+  const isHidden = formEl.classList.contains("hidden");
+  formEl.classList.toggle("hidden", !isHidden);
+  toggleBtn.textContent = isHidden ? "Hide form" : "Add case";
+});
+
+document.getElementById("case-date-today-btn")?.addEventListener("click", () => {
+  const today = new Date();
+  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  fillCaseDateInputsFromISO(iso);
+});
+
+["case-date-year", "case-date-month", "case-date-day"].forEach((id) => {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.addEventListener("input", () => {
+    input.value = (input.value || "").replace(/\D/g, "");
+  });
+});
+
+document.getElementById("case-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!getAuthToken()) {
+    showError("case-error", "Please log in first.");
+    return;
+  }
+
+  const title = document.getElementById("case-title").value.trim();
+  const bodyPart = document.getElementById("case-body-part").value;
+  const status = document.getElementById("case-status").value || "active";
+  const severityVal = parseInt(document.getElementById("case-severity").value, 10);
+  const occurredRaw = buildCaseDateFromInputs();
+  const notes = document.getElementById("case-notes").value.trim() || null;
+  const occurredOn = occurredRaw || null;
+
+  if (!title || !bodyPart) {
+    showError("case-error", "Please provide a case title and body part.");
+    return;
+  }
+  if (occurredRaw === "__INVALID_PARTIAL__") {
+    showError("case-error", "Please fill year, month, and day, or leave all date fields empty.");
+    return;
+  }
+  if (
+    occurredRaw === "__INVALID_FORMAT__"
+    || occurredRaw === "__INVALID_RANGE__"
+    || occurredRaw === "__INVALID_DATE__"
+  ) {
+    showError("case-error", "Please enter a valid date (YYYY-MM-DD).");
+    return;
+  }
+
+  try {
+    await fetchApi("/api/cases", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        body_part: bodyPart,
+        status,
+        severity: Number.isInteger(severityVal) ? Math.min(Math.max(severityVal, 1), 10) : 1,
+        occurred_on: occurredOn,
+        notes,
+      }),
+    });
+    e.target.reset();
+    document.getElementById("case-status").value = "active";
+    document.getElementById("case-severity").value = "3";
+    document.getElementById("case-form").classList.add("hidden");
+    const toggleBtn = document.getElementById("case-toggle-btn");
+    if (toggleBtn) toggleBtn.textContent = "Add case";
+    hideError("case-error");
+    loadCases();
+  } catch (err) {
+    showError("case-error", err.message || "Failed to add case record.");
+  }
+});
+
 // --- Search ---
 let lastSearchResults = [];
 let pendingAddMedMeta = null;
+let activeDetailMed = null;
 let searchSuggestTimer = null;
 let searchSuggestRequestSeq = 0;
 let searchSuggestions = [];
@@ -718,7 +1092,7 @@ async function doSearch() {
       ].filter(Boolean);
       const visualSource = m.image_url ? "Visual: Rx image" : "Visual: Placeholder";
       return `
-        <div class="med-card">
+        <div class="med-card searchable-med-card" data-med-idx="${idx}" tabindex="0" role="button" aria-label="View details for ${escapeHtml(name)}">
           <div class="med-card-top">
             <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" class="med-thumb" loading="lazy" onerror="this.onerror=null;this.src='${MED_PLACEHOLDER_IMAGE}'">
             <div class="med-main">
@@ -730,6 +1104,7 @@ async function doSearch() {
           ${m.generic_name ? `<p>Generic: ${escapeHtml(m.generic_name)}</p>` : ""}
           ${m.manufacturer ? `<p>Manufacturer: ${escapeHtml(m.manufacturer)}</p>` : ""}
           ${m.route ? `<p>Route: ${escapeHtml(m.route)}</p>` : ""}
+          ${m.use_snippet ? `<p>General use: ${escapeHtml(m.use_snippet.substring(0, 170))}${m.use_snippet.length > 170 ? "..." : ""}</p>` : ""}
           ${appearanceItems.length ? `<p>${appearanceItems.join(" | ")}</p>` : ""}
           ${m.warnings_snippet ? `<p>Warnings: ${escapeHtml(m.warnings_snippet.substring(0, 150))}...</p>` : ""}
           <div class="card-actions">
@@ -740,8 +1115,24 @@ async function doSearch() {
       `;
     }).join("");
 
+    resultsEl.querySelectorAll(".searchable-med-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const idx = Number(card.dataset.medIdx);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= lastSearchResults.length) return;
+        openMedDetailModal(lastSearchResults[idx]);
+      });
+      card.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        const idx = Number(card.dataset.medIdx);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= lastSearchResults.length) return;
+        openMedDetailModal(lastSearchResults[idx]);
+      });
+    });
+
     resultsEl.querySelectorAll("[data-action]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
         const action = btn.dataset.action;
         const name = btn.dataset.name;
         const idx = Number(btn.dataset.idx);
@@ -770,6 +1161,64 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
+function openMedDetailModal(med) {
+  if (!med) return;
+  activeDetailMed = med;
+  const name = med.display_name || med.brand_name || med.generic_name || med.substance_name || "Medication";
+  const canonicalName = med.canonical_name && med.canonical_name !== name ? med.canonical_name : null;
+  const imageUrl = med.image_url || MED_PLACEHOLDER_IMAGE;
+  const visualSource = med.image_url ? "Rx image" : "Placeholder";
+  const details = [
+    med.brand_name ? `<p><strong>Brand:</strong> ${escapeHtml(med.brand_name)}</p>` : "",
+    med.generic_name ? `<p><strong>Generic:</strong> ${escapeHtml(med.generic_name)}</p>` : "",
+    med.substance_name ? `<p><strong>Substance:</strong> ${escapeHtml(med.substance_name)}</p>` : "",
+    canonicalName ? `<p><strong>Standard:</strong> ${escapeHtml(canonicalName)}</p>` : "",
+    med.manufacturer ? `<p><strong>Manufacturer:</strong> ${escapeHtml(med.manufacturer)}</p>` : "",
+    med.route ? `<p><strong>Route:</strong> ${escapeHtml(med.route)}</p>` : "",
+    med.use_snippet ? `<p><strong>General use:</strong> ${escapeHtml(med.use_snippet)}</p>` : "<p><strong>General use:</strong> Not available from label data.</p>",
+    med.imprint ? `<p><strong>Imprint:</strong> ${escapeHtml(med.imprint)}</p>` : "",
+    med.color ? `<p><strong>Color:</strong> ${escapeHtml(med.color)}</p>` : "",
+    med.shape ? `<p><strong>Shape:</strong> ${escapeHtml(med.shape)}</p>` : "",
+    med.warnings_snippet ? `<p><strong>Warnings:</strong> ${escapeHtml(med.warnings_snippet)}</p>` : "",
+  ].filter(Boolean).join("");
+
+  document.getElementById("med-detail-title").textContent = name;
+  document.getElementById("med-detail-content").innerHTML = `
+    <div class="med-card-top">
+      <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" class="med-thumb" loading="lazy" onerror="this.onerror=null;this.src='${MED_PLACEHOLDER_IMAGE}'">
+      <div class="med-main">
+        <p class="med-canonical"><strong>Visual source:</strong> ${visualSource}</p>
+      </div>
+    </div>
+    ${details || "<p>No additional details available.</p>"}
+  `;
+  document.getElementById("med-detail-modal").classList.remove("hidden");
+}
+
+function closeMedDetailModal() {
+  document.getElementById("med-detail-modal").classList.add("hidden");
+  activeDetailMed = null;
+}
+
+function toDetailMedFromPillboxMed(med) {
+  if (!med) return null;
+  return {
+    display_name: med.name,
+    brand_name: med.name,
+    generic_name: med.canonical_name || null,
+    substance_name: null,
+    canonical_name: med.canonical_name || null,
+    manufacturer: null,
+    route: null,
+    use_snippet: med.purpose || null,
+    warnings_snippet: null,
+    image_url: med.image_url || null,
+    imprint: med.imprint || null,
+    color: med.color || null,
+    shape: med.shape || null,
+  };
+}
+
 // --- Add Med Modal ---
 function openAddMedModal(presetName = "", sourceMeta = null) {
   document.getElementById("add-med-name").value = presetName;
@@ -792,6 +1241,17 @@ function openAddMedModal(presetName = "", sourceMeta = null) {
 document.getElementById("add-med-cancel").addEventListener("click", () => {
   document.getElementById("add-med-modal").classList.add("hidden");
   pendingAddMedMeta = null;
+});
+
+document.getElementById("med-detail-close").addEventListener("click", closeMedDetailModal);
+document.getElementById("med-detail-modal").addEventListener("click", (e) => {
+  if (e.target.id === "med-detail-modal") closeMedDetailModal();
+});
+document.getElementById("med-detail-add").addEventListener("click", () => {
+  if (!activeDetailMed) return;
+  const name = activeDetailMed.display_name || activeDetailMed.brand_name || activeDetailMed.generic_name || activeDetailMed.substance_name || "";
+  closeMedDetailModal();
+  openAddMedModal(name, activeDetailMed);
 });
 
 document.getElementById("add-med-form").addEventListener("submit", async (e) => {
@@ -922,7 +1382,7 @@ async function loadPillbox() {
         </div>
       `).join("");
       return `
-        <div class="pillbox-card" data-med-id="${m.id}">
+        <div class="pillbox-card searchable-med-card" data-med-id="${m.id}" tabindex="0" role="button" aria-label="View details for ${escapeHtml(m.name)}">
           <div class="med-card-top">
             <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(m.name)}" class="med-thumb" loading="lazy" onerror="this.onerror=null;this.src='${MED_PLACEHOLDER_IMAGE}'">
             <div class="med-main">
@@ -948,23 +1408,54 @@ async function loadPillbox() {
       `;
     }).join("");
 
+    listEl.querySelectorAll(".pillbox-card[data-med-id]").forEach((card) => {
+      const openDetail = () => {
+        const medId = parseInt(card.dataset.medId, 10);
+        const med = (cachedMeds || []).find((x) => x.id === medId);
+        if (!med) return;
+        openMedDetailModal(toDetailMedFromPillboxMed(med));
+      };
+      card.addEventListener("click", (ev) => {
+        if (ev.target.closest("button")) return;
+        openDetail();
+      });
+      card.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        openDetail();
+      });
+    });
+
     listEl.querySelectorAll("[data-edit-med]").forEach((btn) => {
-      btn.addEventListener("click", () => openEditMedModal(parseInt(btn.dataset.id, 10)));
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        openEditMedModal(parseInt(btn.dataset.id, 10));
+      });
     });
     listEl.querySelectorAll("[data-add-sched]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
         document.getElementById("add-schedule-med-id").value = btn.dataset.id;
         openAddScheduleModal();
       });
     });
     listEl.querySelectorAll("[data-del-med]").forEach((btn) => {
-      btn.addEventListener("click", () => openDeleteMedModal(parseInt(btn.dataset.id, 10), btn.dataset.name || ""));
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        openDeleteMedModal(parseInt(btn.dataset.id, 10), btn.dataset.name || "");
+      });
     });
     listEl.querySelectorAll("[data-edit-sched]").forEach((btn) => {
-      btn.addEventListener("click", () => alert("Edit schedule: use API or a future version"));
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        alert("Edit schedule: use API or a future version");
+      });
     });
     listEl.querySelectorAll("[data-del-sched]").forEach((btn) => {
-      btn.addEventListener("click", () => deleteSchedule(parseInt(btn.dataset.id, 10)));
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        deleteSchedule(parseInt(btn.dataset.id, 10));
+      });
     });
     startCountdownUpdates();
   } catch (err) {
@@ -1341,6 +1832,7 @@ populateStateSelect();
   if (oauthUser) {
     loadPillbox();
     loadProfile();
+    loadCases();
     return;
   }
   const user = await checkAuth();
@@ -1348,10 +1840,12 @@ populateStateSelect();
   if (user) {
     loadPillbox();
     loadProfile();
+    loadCases();
   } else {
     document.getElementById("pillbox-list").innerHTML = '<p class="empty-state">Please log in to view your pillbox.</p>';
     updateProfileUI(null);
     loadWeather(null, null);
+    clearCaseStateForGuest();
   }
 })();
 loadNotifications();

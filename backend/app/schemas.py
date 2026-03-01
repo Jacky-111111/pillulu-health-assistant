@@ -1,5 +1,5 @@
 """Pydantic schemas for request/response validation."""
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 
 from pydantic import BaseModel, Field
@@ -12,6 +12,7 @@ class MedSearchResult(BaseModel):
     manufacturer: Optional[str] = None
     route: Optional[str] = None
     substance_name: Optional[str] = None
+    use_snippet: Optional[str] = None
     warnings_snippet: Optional[str] = None
     display_name: Optional[str] = None  # Best available name (from openfda or fallback fields)
     canonical_name: Optional[str] = None
@@ -140,6 +141,45 @@ class NotificationResponse(BaseModel):
     message: str
     created_at: datetime
     read_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Case Records ---
+class CaseRecordCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    diagnosis: Optional[str] = Field(None, max_length=500)
+    body_part: str = Field(..., min_length=1, max_length=64)
+    severity: int = Field(default=1, ge=1, le=10)
+    status: str = Field(default="active", pattern=r"^(active|resolved|chronic)$")
+    occurred_on: Optional[date] = None
+    resolved_on: Optional[date] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+class CaseRecordUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    diagnosis: Optional[str] = Field(None, max_length=500)
+    body_part: Optional[str] = Field(None, min_length=1, max_length=64)
+    severity: Optional[int] = Field(None, ge=1, le=10)
+    status: Optional[str] = Field(None, pattern=r"^(active|resolved|chronic)$")
+    occurred_on: Optional[date] = None
+    resolved_on: Optional[date] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+class CaseRecordResponse(BaseModel):
+    id: int
+    title: str
+    diagnosis: Optional[str] = None
+    body_part: str
+    severity: int
+    status: str
+    occurred_on: Optional[date] = None
+    resolved_on: Optional[date] = None
+    notes: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
