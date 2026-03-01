@@ -166,6 +166,7 @@ document.getElementById("login-submit").addEventListener("click", async () => {
     });
     setAuthToken(data.token);
     updateAuthUI({ email: data.email });
+    pillboxVisualEnrichTriggered = false;
     document.getElementById("login-modal").classList.add("hidden");
     document.getElementById("login-email").value = "";
     document.getElementById("login-password").value = "";
@@ -199,6 +200,7 @@ document.getElementById("register-submit").addEventListener("click", async () =>
     });
     setAuthToken(data.token);
     updateAuthUI({ email: data.email });
+    pillboxVisualEnrichTriggered = false;
     document.getElementById("login-modal").classList.add("hidden");
     document.getElementById("register-email").value = "";
     document.getElementById("register-password").value = "";
@@ -212,6 +214,7 @@ document.getElementById("register-submit").addEventListener("click", async () =>
 
 document.getElementById("logout-btn").addEventListener("click", () => {
   clearAuthToken();
+  pillboxVisualEnrichTriggered = false;
   updateAuthUI(null);
   loadPillbox();
   updateProfileUI(null);
@@ -415,10 +418,40 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
 // --- Search ---
 let lastSearchResults = [];
 let pendingAddMedMeta = null;
+let searchSuggestTimer = null;
+let searchSuggestRequestSeq = 0;
+let searchSuggestions = [];
+let searchSuggestActiveIndex = -1;
+const searchSuggestCache = new Map();
 
 document.getElementById("search-btn").addEventListener("click", doSearch);
-document.getElementById("search-input").addEventListener("keypress", (e) => {
-  if (e.key === "Enter") doSearch();
+document.getElementById("search-input").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") {
+    if (!searchSuggestions.length) return;
+    e.preventDefault();
+    searchSuggestActiveIndex = Math.min(searchSuggestActiveIndex + 1, searchSuggestions.length - 1);
+    renderSearchSuggestions();
+    return;
+  }
+  if (e.key === "ArrowUp") {
+    if (!searchSuggestions.length) return;
+    e.preventDefault();
+    searchSuggestActiveIndex = Math.max(searchSuggestActiveIndex - 1, 0);
+    renderSearchSuggestions();
+    return;
+  }
+  if (e.key === "Enter") {
+    if (searchSuggestActiveIndex >= 0 && searchSuggestActiveIndex < searchSuggestions.length) {
+      e.preventDefault();
+      applySearchSuggestion(searchSuggestions[searchSuggestActiveIndex], true);
+      return;
+    }
+    clearSearchSuggestions();
+    doSearch();
+  }
+});
+document.getElementById("search-input").addEventListener("input", () => {
+  queueSearchSuggestions();
 });
 document.getElementById("scan-btn").addEventListener("click", openScanModal);
 document.getElementById("scan-cancel").addEventListener("click", closeScanModal);
@@ -571,8 +604,91 @@ async function captureAndDetectFromCamera() {
 }
 
 window.addEventListener("beforeunload", stopScanCamera);
+document.addEventListener("click", (e) => {
+  const box = document.querySelector(".search-box .input-with-clear");
+  if (!box || box.contains(e.target)) return;
+  clearSearchSuggestions();
+});
+
+function clearSearchSuggestions() {
+  const el = document.getElementById("search-suggestions");
+  if (!el) return;
+  searchSuggestions = [];
+  searchSuggestActiveIndex = -1;
+  el.innerHTML = "";
+  el.classList.add("hidden");
+}
+
+function renderSearchSuggestions() {
+  const el = document.getElementById("search-suggestions");
+  if (!el) return;
+  if (!searchSuggestions.length) {
+    clearSearchSuggestions();
+    return;
+  }
+  el.innerHTML = searchSuggestions
+    .slice(0, 3)
+    .map((name, i) => {
+      const activeClass = i === searchSuggestActiveIndex ? " active" : "";
+      return `<button type="button" class="search-suggestion-item${activeClass}" data-suggest-idx="${i}">${escapeHtml(name)}</button>`;
+    })
+    .join("");
+  el.classList.remove("hidden");
+
+  el.querySelectorAll("[data-suggest-idx]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.suggestIdx, 10);
+      if (Number.isInteger(idx) && idx >= 0 && idx < searchSuggestions.length) {
+        applySearchSuggestion(searchSuggestions[idx], true);
+      }
+    });
+  });
+}
+
+function applySearchSuggestion(value, runSearch = false) {
+  const input = document.getElementById("search-input");
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  clearSearchSuggestions();
+  if (runSearch) doSearch();
+}
+
+function queueSearchSuggestions() {
+  const q = document.getElementById("search-input").value.trim();
+  if (q.length < 1) {
+    clearSearchSuggestions();
+    return;
+  }
+  const key = q.toLowerCase();
+  if (searchSuggestCache.has(key)) {
+    searchSuggestions = (searchSuggestCache.get(key) || []).slice(0, 3);
+    searchSuggestActiveIndex = searchSuggestions.length ? 0 : -1;
+    renderSearchSuggestions();
+    return;
+  }
+  if (searchSuggestTimer) clearTimeout(searchSuggestTimer);
+  searchSuggestTimer = setTimeout(async () => {
+    const seq = ++searchSuggestRequestSeq;
+    try {
+      const data = await fetchApi(`/api/med/suggest?q=${encodeURIComponent(q)}`);
+      if (seq !== searchSuggestRequestSeq) return;
+      searchSuggestions = (data || []).slice(0, 3);
+      searchSuggestCache.set(key, searchSuggestions);
+      if (searchSuggestCache.size > 200) {
+        const firstKey = searchSuggestCache.keys().next().value;
+        if (firstKey) searchSuggestCache.delete(firstKey);
+      }
+      searchSuggestActiveIndex = searchSuggestions.length ? 0 : -1;
+      renderSearchSuggestions();
+    } catch {
+      if (seq !== searchSuggestRequestSeq) return;
+      clearSearchSuggestions();
+    }
+  }, 80);
+}
 
 async function doSearch() {
+  clearSearchSuggestions();
   const input = document.getElementById("search-input");
   const q = (input.value || "").trim();
   const resultsEl = document.getElementById("search-results");
@@ -600,6 +716,7 @@ async function doSearch() {
         m.color ? `Color: ${escapeHtml(m.color)}` : null,
         m.shape ? `Shape: ${escapeHtml(m.shape)}` : null,
       ].filter(Boolean);
+      const visualSource = m.image_url ? "Visual: Rx image" : "Visual: Placeholder";
       return `
         <div class="med-card">
           <div class="med-card-top">
@@ -607,6 +724,7 @@ async function doSearch() {
             <div class="med-main">
               <h4>${escapeHtml(name)}</h4>
               ${canonicalName ? `<p class="med-canonical">Standard: ${escapeHtml(canonicalName)}</p>` : ""}
+              <p class="med-canonical">${visualSource}</p>
             </div>
           </div>
           ${m.generic_name ? `<p>Generic: ${escapeHtml(m.generic_name)}</p>` : ""}
@@ -757,6 +875,7 @@ async function doAiAsk() {
 
 // --- Pillbox ---
 let cachedMeds = [];
+let pillboxVisualEnrichTriggered = false;
 
 async function loadPillbox() {
   hideError("pillbox-error");
@@ -766,7 +885,16 @@ async function loadPillbox() {
   emptyEl.classList.add("hidden");
 
   try {
-    const meds = await fetchApi("/api/pillbox/meds");
+    let meds = await fetchApi("/api/pillbox/meds");
+    if (!pillboxVisualEnrichTriggered && (meds || []).some((m) => !(m.image_url || m.imprint || m.color || m.shape))) {
+      pillboxVisualEnrichTriggered = true;
+      try {
+        await fetchApi("/api/pillbox/enrich-visuals", { method: "POST" });
+        meds = await fetchApi("/api/pillbox/meds");
+      } catch (err) {
+        console.warn("Pillbox visual enrich failed:", err);
+      }
+    }
     cachedMeds = meds || [];
     if (!meds || meds.length === 0) {
       listEl.innerHTML = "";
@@ -783,6 +911,7 @@ async function loadPillbox() {
         m.color ? `Color: ${escapeHtml(m.color)}` : null,
         m.shape ? `Shape: ${escapeHtml(m.shape)}` : null,
       ].filter(Boolean);
+      const visualSource = m.image_url ? "Visual: Rx image" : "Visual: Placeholder";
       const schedulesHtml = (m.schedules || []).map((s) => `
         <div class="schedule-item">
           <span class="schedule-time">${escapeHtml(s.time_of_day)} ${s.days_of_week}</span>
@@ -799,6 +928,7 @@ async function loadPillbox() {
             <div class="med-main">
               <h4>${escapeHtml(m.name)}</h4>
               ${m.canonical_name ? `<p class="med-canonical">Standard: ${escapeHtml(m.canonical_name)}</p>` : ""}
+              <p class="med-canonical">${visualSource}</p>
             </div>
           </div>
           ${m.purpose ? `<p>Purpose: ${escapeHtml(m.purpose)}</p>` : ""}

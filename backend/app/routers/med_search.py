@@ -2,7 +2,7 @@
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from app.services.openfda import search_medications
+from app.services.openfda import search_medications, suggest_medication_names
 from app.schemas import MedSearchResult
 
 router = APIRouter(prefix="/api/med", tags=["med-search"])
@@ -23,3 +23,15 @@ async def search_meds(q: str = ""):
         raise HTTPException(status_code=502, detail=f"OpenFDA request failed: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Medication search failed: {str(e)}")
+
+
+@router.get("/suggest", response_model=list[str])
+async def suggest_meds(q: str = ""):
+    """Typeahead suggestions for medication names."""
+    query = (q or "").strip()
+    if len(query) < 1:
+        return []
+    try:
+        return await suggest_medication_names(query, limit=3)
+    except Exception:
+        return []

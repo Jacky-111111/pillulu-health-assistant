@@ -1,5 +1,7 @@
 """OpenFDA + RxNav medication search and visual enrichment."""
+import asyncio
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -32,6 +34,10 @@ for _canonical, _aliases in _SYNONYM_GROUPS.items():
     _ALIAS_TO_CANONICAL[_canonical] = _canonical
     for _alias in _aliases:
         _ALIAS_TO_CANONICAL[_alias] = _canonical
+
+_SUGGEST_CACHE: Dict[str, tuple[float, List[str]]] = {}
+_SUGGEST_CACHE_TTL_SECONDS = 180.0
+_SUGGEST_CACHE_MAX_ENTRIES = 400
 
 
 def _normalize_name(value: str) -> str:
@@ -75,13 +81,6 @@ def _candidate_attempts(term: str) -> List[Optional[int]]:
     elif len(term) >= 4:
         attempts.append(len(term) - 1)
     return attempts
-
-
-def _is_oral_solid(route: Optional[str], dosage_form: Optional[str]) -> bool:
-    route_ok = "ORAL" in (route or "").upper()
-    form = (dosage_form or "").upper()
-    form_ok = any(token in form for token in ("TABLET", "CAPSULE", "CAPLET", "SOFTGEL", "PILL"))
-    return route_ok and form_ok
 
 
 def _extract_property_map(ndc_data: Dict[str, Any]) -> Dict[str, str]:
@@ -193,6 +192,18 @@ async def _fetch_visual_by_rxcui(
     return visual
 
 
+async def _resolve_best_rxcui(
+    names: List[str], client: httpx.AsyncClient, rxcui_cache: Dict[str, Optional[str]]
+) -> Optional[str]:
+    for name in names:
+        if not name:
+            continue
+        rxcui = await _resolve_rxcui_by_name(name, client, rxcui_cache)
+        if rxcui:
+            return rxcui
+    return None
+
+
 async def _build_query_variants(query: str, client: httpx.AsyncClient) -> List[str]:
     variants: List[str] = [query]
     norm = _normalize_name(query)
@@ -216,6 +227,28 @@ async def _build_query_variants(query: str, client: httpx.AsyncClient) -> List[s
         seen.add(key)
         deduped.append(vv)
     return deduped
+
+
+async def enrich_med_visuals(
+    *,
+    display_name: str,
+    generic_name: Optional[str] = None,
+    substance_name: Optional[str] = None,
+    canonical_name: Optional[str] = None,
+    rxcui: Optional[str] = None,
+) -> Dict[str, Optional[str]]:
+    image_cache: Dict[str, Dict[str, Optional[str]]] = {}
+    ndc_cache: Dict[str, Dict[str, Optional[str]]] = {}
+    rxcui_cache: Dict[str, Optional[str]] = {}
+
+    candidates = [display_name, canonical_name, generic_name, substance_name]
+    candidates = [c for c in candidates if c]
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resolved_rxcui = rxcui or await _resolve_best_rxcui(candidates, client, rxcui_cache)
+        if not resolved_rxcui:
+            return {"image_url": None, "imprint": None, "color": None, "shape": None}
+        return await _fetch_visual_by_rxcui(resolved_rxcui, client, image_cache, ndc_cache)
 
 
 async def search_medications(query: str, limit: int = 10) -> List[MedSearchResult]:
@@ -254,7 +287,6 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
                     substance = _get_first_str(openfda.get("substance_name"))
                     manufacturer = _get_first_str(openfda.get("manufacturer_name"))
                     route = _get_first_str(openfda.get("route"))
-                    dosage_form = _get_first_str(openfda.get("dosage_form"))
                     rxcui = _get_first_str(openfda.get("rxcui"))
 
                     display_name = _display_name(brand, generic, substance)
@@ -271,10 +303,11 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
                     warnings_snippet = warnings[0][:300] if warnings else None
 
                     visual = {"image_url": None, "imprint": None, "color": None, "shape": None}
-                    if _is_oral_solid(route, dosage_form):
-                        resolved_rxcui = rxcui or await _resolve_rxcui_by_name(display_name, client, rxcui_cache)
-                        if resolved_rxcui:
-                            visual = await _fetch_visual_by_rxcui(resolved_rxcui, client, image_cache, ndc_cache)
+                    resolved_rxcui = rxcui or await _resolve_best_rxcui(
+                        [display_name, canonical_name, generic, substance], client, rxcui_cache
+                    )
+                    if resolved_rxcui:
+                        visual = await _fetch_visual_by_rxcui(resolved_rxcui, client, image_cache, ndc_cache)
 
                     if not visual.get("imprint"):
                         visual["imprint"] = _get_first_str(item.get("spl_imprint"))
@@ -308,3 +341,86 @@ async def search_medications(query: str, limit: int = 10) -> List[MedSearchResul
                 break
 
     return results[:limit]
+
+
+async def suggest_medication_names(query: str, limit: int = 3) -> List[str]:
+    """Return lightweight medication name suggestions for typeahead."""
+    q = query.strip()
+    if not q:
+        return []
+    q_key = _normalize_name(q)
+    if not q_key:
+        return []
+
+    now = time.time()
+    cached = _SUGGEST_CACHE.get(q_key)
+    if cached and now - cached[0] <= _SUGGEST_CACHE_TTL_SECONDS:
+        return cached[1][:limit]
+
+    suggestions: List[str] = []
+    scored: List[tuple[int, str]] = []
+    seen_keys: set[str] = set()
+    norm_q = _normalize_name(q)
+
+    def _score_candidate(name: str) -> int:
+        n = _normalize_name(name)
+        if not n:
+            return 99
+        if n.startswith(norm_q):
+            return 0
+        if any(part.startswith(norm_q) for part in n.split()):
+            return 1
+        if norm_q in n:
+            return 2
+        return 99
+
+    async with httpx.AsyncClient(timeout=6.0) as client:
+        # Typeahead should be fast: one narrow wildcard term, parallel field requests.
+        term = _build_term(f"{q}*", prefix_len=None) if len(q) >= 2 else _build_term(q, prefix_len=None)
+        if not term:
+            return []
+
+        fields = ["generic_name", "brand_name"] if len(norm_q) <= 3 else ["generic_name", "brand_name", "substance_name"]
+        tasks = [_fetch_one_field(field, term, max(limit * 3, 8), client) for field in fields]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_items: List[dict] = []
+        for resp in responses:
+            if isinstance(resp, Exception):
+                continue
+            all_items.extend(resp)
+
+        # For longer terms, one extra relaxed exact query as fallback.
+        if len(all_items) < limit and len(norm_q) >= 6:
+            fallback_tasks = [_fetch_one_field(field, _build_term(q, prefix_len=None), max(limit * 2, 6), client) for field in fields]
+            fallback_responses = await asyncio.gather(*fallback_tasks, return_exceptions=True)
+            for resp in fallback_responses:
+                if isinstance(resp, Exception):
+                    continue
+                all_items.extend(resp)
+
+        for item in all_items:
+            openfda = item.get("openfda", {})
+            brand = _get_first_str(openfda.get("brand_name"))
+            generic = _get_first_str(openfda.get("generic_name"))
+            substance = _get_first_str(openfda.get("substance_name"))
+            display_name = _display_name(brand, generic, substance)
+            if not display_name:
+                continue
+
+            key = _normalize_name(generic or substance or display_name)
+            if not key or key in seen_keys:
+                continue
+            score = _score_candidate(display_name)
+            if score >= 99:
+                continue
+            seen_keys.add(key)
+            scored.append((score, display_name))
+
+    scored.sort(key=lambda x: (x[0], len(x[1]), x[1].lower()))
+    suggestions = [name for _, name in scored][:limit]
+    _SUGGEST_CACHE[q_key] = (time.time(), suggestions[:limit])
+    if len(_SUGGEST_CACHE) > _SUGGEST_CACHE_MAX_ENTRIES:
+        oldest_key = min(_SUGGEST_CACHE.keys(), key=lambda k: _SUGGEST_CACHE[k][0])
+        _SUGGEST_CACHE.pop(oldest_key, None)
+    return suggestions[:limit]

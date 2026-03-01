@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Med, Schedule, User
 from app.routers.auth import get_current_user
+from app.services.openfda import enrich_med_visuals
 from app.schemas import (
     MedCreate,
     MedUpdate,
@@ -86,6 +87,37 @@ def create_med(body: MedCreate, db: Session = Depends(get_db), user: User = Depe
 def list_meds(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     meds = db.query(Med).filter(Med.user_id == user.id).order_by(Med.created_at.desc()).all()
     return [med_to_response(m) for m in meds]
+
+
+@router.post("/pillbox/enrich-visuals")
+async def enrich_pillbox_visuals(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    meds = db.query(Med).filter(Med.user_id == user.id).order_by(Med.created_at.desc()).limit(60).all()
+    updated = 0
+    for med in meds:
+        has_any_visual = bool(med.image_url or med.imprint or med.color or med.shape)
+        if has_any_visual and med.canonical_name:
+            continue
+
+        visual = await enrich_med_visuals(
+            display_name=med.name,
+            canonical_name=med.canonical_name,
+        )
+        changed = False
+        if not med.canonical_name:
+            med.canonical_name = med.name
+            changed = True
+        for field in ["image_url", "imprint", "color", "shape"]:
+            value = visual.get(field)
+            if value and getattr(med, field) != value:
+                setattr(med, field, value)
+                changed = True
+        if changed:
+            updated += 1
+
+    if updated > 0:
+        db.commit()
+
+    return {"ok": True, "updated": updated, "checked": len(meds)}
 
 
 @router.get("/pillbox/meds/{med_id}", response_model=MedResponse)
