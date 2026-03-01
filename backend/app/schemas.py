@@ -28,10 +28,23 @@ class AIAskRequest(BaseModel):
     context_med_name: Optional[str] = Field(None, max_length=255)
 
 
+class AIRelatedCase(BaseModel):
+    id: int
+    title: str
+    body_part: str
+    status: str
+    severity: int
+    occurred_on: Optional[date] = None
+
+
 class AIAskResponse(BaseModel):
     answer: str
     disclaimer: str
     suggested_medications: List[str] = []
+    related_cases: List[AIRelatedCase] = []
+    history_context_used: bool = False
+    auto_case_created: bool = False
+    auto_case: Optional[AIRelatedCase] = None
 
 
 # --- Pillbox Meds ---
@@ -117,6 +130,7 @@ class UserEmailUpdate(BaseModel):
 # --- User Profile ---
 class UserProfileResponse(BaseModel):
     age: Optional[int] = None
+    gender: Optional[str] = None
     height_cm: Optional[int] = None
     weight_kg: Optional[int] = None
     region: Optional[str] = None  # legacy
@@ -126,6 +140,7 @@ class UserProfileResponse(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     age: Optional[int] = Field(None, ge=1, le=150)
+    gender: Optional[str] = Field(None, pattern=r"^(male|female|non-binary)$")
     height_cm: Optional[int] = Field(None, ge=50, le=300)
     weight_kg: Optional[int] = Field(None, ge=20, le=500)
     region: Optional[str] = Field(None, max_length=128)

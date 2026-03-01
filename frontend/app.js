@@ -266,6 +266,14 @@ function renderProfileValue(val) {
   return val != null && val !== "" ? String(val) : "—";
 }
 
+function renderGenderValue(val) {
+  if (!val) return "—";
+  if (val === "male") return "Male";
+  if (val === "female") return "Female";
+  if (val === "non-binary") return "Non-binary";
+  return String(val);
+}
+
 function updateProfileUI(profile) {
   const displayEl = document.getElementById("profile-display");
   const promptEl = document.getElementById("profile-login-prompt");
@@ -274,6 +282,7 @@ function updateProfileUI(profile) {
     displayEl.classList.remove("hidden");
     promptEl.classList.add("hidden");
     document.getElementById("profile-age").textContent = renderProfileValue(profile.age);
+    document.getElementById("profile-gender").textContent = renderGenderValue(profile.gender);
     document.getElementById("profile-height").textContent = renderProfileValue(profile.height_cm);
     document.getElementById("profile-weight").textContent = renderProfileValue(profile.weight_kg);
     const loc = [profile.city, profile.state].filter(Boolean).join(", ") || profile.region;
@@ -377,6 +386,7 @@ document.getElementById("profile-edit-btn").addEventListener("click", async () =
   try {
     const p = await fetchApi("/api/user/profile");
     document.getElementById("profile-age-input").value = p.age ?? "";
+    document.getElementById("profile-gender-input").value = p.gender ?? "";
     document.getElementById("profile-height-input").value = p.height_cm ?? "";
     document.getElementById("profile-weight-input").value = p.weight_kg ?? "";
     document.getElementById("profile-state-input").value = p.state ?? "";
@@ -395,6 +405,7 @@ document.getElementById("profile-cancel").addEventListener("click", () => {
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const age = document.getElementById("profile-age-input").value;
+  const gender = document.getElementById("profile-gender-input").value || null;
   const height_cm = document.getElementById("profile-height-input").value;
   const weight_kg = document.getElementById("profile-weight-input").value;
   const state = document.getElementById("profile-state-input").value || null;
@@ -404,6 +415,7 @@ document.getElementById("profile-form").addEventListener("submit", async (e) => 
       method: "PUT",
       body: JSON.stringify({
         age: age ? parseInt(age, 10) : null,
+        gender,
         height_cm: height_cm ? parseInt(height_cm, 10) : null,
         weight_kg: weight_kg ? parseInt(weight_kg, 10) : null,
         state,
@@ -431,6 +443,7 @@ const BODY_PART_LABELS = {
 
 let cachedCases = [];
 let activeBodyPartFilter = null;
+let editingCaseId = null;
 
 function getBodyPartLabel(bodyPart) {
   return BODY_PART_LABELS[bodyPart] || bodyPart || "Unknown";
@@ -438,6 +451,82 @@ function getBodyPartLabel(bodyPart) {
 
 function formatCaseDate(dateStr) {
   return dateStr || "N/A";
+}
+
+const BODY_PANEL_SIDE_KEY = "pillulu_body_panel_side";
+
+function applyBodyPanelSide(side) {
+  const layoutEl = document.querySelector(".app-layout");
+  if (!layoutEl) return;
+  const normalized = side === "right" ? "right" : "left";
+  layoutEl.classList.toggle("body-panel-right", normalized === "right");
+  const labelEl = document.getElementById("body-panel-side-label");
+  if (labelEl) labelEl.textContent = `Docked: ${normalized}`;
+  try {
+    localStorage.setItem(BODY_PANEL_SIDE_KEY, normalized);
+  } catch {}
+}
+
+function initBodyPanelDrag() {
+  const layoutEl = document.querySelector(".app-layout");
+  const panelEl = document.getElementById("body-panel");
+  const handleEl = document.getElementById("body-panel-drag-handle");
+  if (!layoutEl || !panelEl || !handleEl) return;
+
+  let dragging = false;
+  let startX = 0;
+
+  try {
+    const saved = localStorage.getItem(BODY_PANEL_SIDE_KEY);
+    if (saved === "left" || saved === "right") {
+      applyBodyPanelSide(saved);
+    } else {
+      applyBodyPanelSide("left");
+    }
+  } catch {
+    applyBodyPanelSide("left");
+  }
+
+  const resetDragVisual = () => {
+    panelEl.style.transform = "";
+    panelEl.classList.remove("dragging");
+  };
+
+  const finishDrag = (clientX) => {
+    if (!dragging) return;
+    dragging = false;
+    const layoutRect = layoutEl.getBoundingClientRect();
+    const midpoint = layoutRect.left + layoutRect.width / 2;
+    applyBodyPanelSide(clientX >= midpoint ? "right" : "left");
+    resetDragVisual();
+  };
+
+  handleEl.addEventListener("pointerdown", (ev) => {
+    if (window.matchMedia("(max-width: 900px)").matches) return;
+    dragging = true;
+    startX = ev.clientX;
+    panelEl.classList.add("dragging");
+    handleEl.setPointerCapture?.(ev.pointerId);
+  });
+
+  handleEl.addEventListener("pointermove", (ev) => {
+    if (!dragging) return;
+    const dx = ev.clientX - startX;
+    panelEl.style.transform = `translateX(${dx}px)`;
+  });
+
+  handleEl.addEventListener("pointerup", (ev) => {
+    finishDrag(ev.clientX);
+  });
+
+  handleEl.addEventListener("pointercancel", (ev) => {
+    finishDrag(ev.clientX);
+  });
+
+  handleEl.addEventListener("dblclick", () => {
+    const right = layoutEl.classList.contains("body-panel-right");
+    applyBodyPanelSide(right ? "left" : "right");
+  });
 }
 
 function getCasesForBodyPart(bodyPart) {
@@ -533,6 +622,56 @@ function fillCaseDateInputsFromISO(isoDate) {
   if (dayEl) dayEl.value = String(parseInt(d, 10));
 }
 
+function setCaseFormEditingState(editing) {
+  const submitBtn = document.getElementById("case-submit-btn");
+  const cancelBtn = document.getElementById("case-cancel-edit-btn");
+  if (submitBtn) submitBtn.textContent = editing ? "Save case" : "Add case";
+  if (cancelBtn) cancelBtn.classList.toggle("hidden", !editing);
+}
+
+function resetCaseEditorState() {
+  editingCaseId = null;
+  setCaseFormEditingState(false);
+}
+
+function openCaseFormPanel() {
+  const formEl = document.getElementById("case-form");
+  const toggleBtn = document.getElementById("case-toggle-btn");
+  if (formEl) formEl.classList.remove("hidden");
+  if (toggleBtn) toggleBtn.textContent = "Hide form";
+}
+
+function beginEditCase(caseId) {
+  const item = (cachedCases || []).find((c) => c.id === caseId);
+  if (!item) return;
+  editingCaseId = caseId;
+  setCaseFormEditingState(true);
+  openCaseFormPanel();
+  document.getElementById("case-title").value = item.title || "";
+  document.getElementById("case-diagnosis").value = item.diagnosis || "";
+  document.getElementById("case-body-part").value = item.body_part || "";
+  document.getElementById("case-status").value = item.status || "active";
+  document.getElementById("case-severity").value = String(item.severity || 3);
+  fillCaseDateInputsFromISO(item.occurred_on || "");
+  document.getElementById("case-notes").value = item.notes || "";
+  document.getElementById("case-title").focus();
+}
+
+async function beginEditCaseWithRefresh(caseId) {
+  if ((cachedCases || []).some((c) => c.id === caseId)) {
+    beginEditCase(caseId);
+    return;
+  }
+  await loadCases();
+  beginEditCase(caseId);
+}
+
+function scrollToCaseHistory() {
+  const panel = document.getElementById("case-list") || document.querySelector(".case-history-section");
+  if (!panel) return;
+  panel.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function updateBodyFilterLabel() {
   const labelEl = document.getElementById("active-body-filter");
   if (!labelEl) return;
@@ -621,11 +760,21 @@ function renderCaseList() {
           ${item.notes ? `<p class="case-row-meta">${escapeHtml(item.notes)}</p>` : ""}
         </div>
         <div class="case-item-actions">
+          <button type="button" class="btn btn-secondary btn-small" data-edit-case="${item.id}">Edit</button>
           <button type="button" class="btn btn-secondary btn-small" data-del-case="${item.id}">Delete</button>
         </div>
       </article>
     `;
   }).join("");
+
+  listEl.querySelectorAll("[data-edit-case]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const caseId = parseInt(btn.dataset.editCase, 10);
+      if (!Number.isInteger(caseId)) return;
+      await beginEditCaseWithRefresh(caseId);
+      scrollToCaseHistory();
+    });
+  });
 
   listEl.querySelectorAll("[data-del-case]").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -645,6 +794,7 @@ function renderCaseList() {
 function clearCaseStateForGuest() {
   cachedCases = [];
   activeBodyPartFilter = null;
+  resetCaseEditorState();
   hideError("case-error");
   const formEl = document.getElementById("case-form");
   const toggleBtn = document.getElementById("case-toggle-btn");
@@ -673,6 +823,9 @@ async function loadCases() {
   try {
     const items = await fetchApi("/api/cases");
     cachedCases = items || [];
+    if (editingCaseId != null && !cachedCases.some((c) => c.id === editingCaseId)) {
+      resetCaseEditorState();
+    }
     renderBodyMarkers();
     renderCaseList();
     updateBodyFilterLabel();
@@ -715,6 +868,19 @@ document.getElementById("case-toggle-btn")?.addEventListener("click", () => {
   const isHidden = formEl.classList.contains("hidden");
   formEl.classList.toggle("hidden", !isHidden);
   toggleBtn.textContent = isHidden ? "Hide form" : "Add case";
+  if (!isHidden) {
+    document.getElementById("case-form")?.reset();
+    document.getElementById("case-status").value = "active";
+    document.getElementById("case-severity").value = "3";
+    resetCaseEditorState();
+  }
+});
+
+document.getElementById("case-cancel-edit-btn")?.addEventListener("click", () => {
+  document.getElementById("case-form")?.reset();
+  document.getElementById("case-status").value = "active";
+  document.getElementById("case-severity").value = "3";
+  resetCaseEditorState();
 });
 
 document.getElementById("case-date-today-btn")?.addEventListener("click", () => {
@@ -739,6 +905,7 @@ document.getElementById("case-form")?.addEventListener("submit", async (e) => {
   }
 
   const title = document.getElementById("case-title").value.trim();
+  const diagnosis = document.getElementById("case-diagnosis").value.trim() || null;
   const bodyPart = document.getElementById("case-body-part").value;
   const status = document.getElementById("case-status").value || "active";
   const severityVal = parseInt(document.getElementById("case-severity").value, 10);
@@ -764,10 +931,13 @@ document.getElementById("case-form")?.addEventListener("submit", async (e) => {
   }
 
   try {
-    await fetchApi("/api/cases", {
-      method: "POST",
+    const method = editingCaseId != null ? "PUT" : "POST";
+    const path = editingCaseId != null ? `/api/cases/${editingCaseId}` : "/api/cases";
+    await fetchApi(path, {
+      method,
       body: JSON.stringify({
         title,
+        diagnosis,
         body_part: bodyPart,
         status,
         severity: Number.isInteger(severityVal) ? Math.min(Math.max(severityVal, 1), 10) : 1,
@@ -781,10 +951,11 @@ document.getElementById("case-form")?.addEventListener("submit", async (e) => {
     document.getElementById("case-form").classList.add("hidden");
     const toggleBtn = document.getElementById("case-toggle-btn");
     if (toggleBtn) toggleBtn.textContent = "Add case";
+    resetCaseEditorState();
     hideError("case-error");
     loadCases();
   } catch (err) {
-    showError("case-error", err.message || "Failed to add case record.");
+    showError("case-error", err.message || "Failed to save case record.");
   }
 });
 
@@ -1311,6 +1482,7 @@ async function doAiAsk() {
     answerEl.querySelector(".answer-disclaimer").textContent = data.disclaimer;
 
     const suggestedEl = document.getElementById("ai-suggested-meds");
+    const relatedHistoryEl = document.getElementById("ai-related-history");
     if (data.suggested_medications && data.suggested_medications.length > 0) {
       suggestedEl.innerHTML = `<p class="suggested-label">Add to Pillbox:</p>` + data.suggested_medications.map((name) =>
         `<button type="button" class="btn btn-secondary btn-small add-from-ai" data-med-name="${escapeHtml(name)}">${escapeHtml(name)}</button>`
@@ -1322,6 +1494,79 @@ async function doAiAsk() {
     } else {
       suggestedEl.innerHTML = "";
       suggestedEl.classList.add("hidden");
+    }
+
+    if (relatedHistoryEl) {
+      const relatedCases = Array.isArray(data.related_cases) ? data.related_cases : [];
+      const autoCase = data.auto_case || null;
+      const autoCaseCreated = !!data.auto_case_created;
+      if (relatedCases.length > 0) {
+        relatedHistoryEl.innerHTML = `
+          <p class="history-label">Related to your case history</p>
+          ${autoCase
+            ? `<p class="history-label">${autoCaseCreated ? "Auto-added to history:" : "History note detected:"} ${escapeHtml(autoCase.title || "Case")}</p>`
+            : ""}
+          <div class="history-items">
+            ${relatedCases.map((item) => `
+              <span class="history-chip">
+                ${escapeHtml(item.title || "Untitled")}
+                <button type="button" class="btn btn-secondary btn-small ai-edit-case-btn" data-case-id="${item.id}">Edit</button>
+              </span>
+            `).join("")}
+          </div>
+          <div class="history-actions">
+            <button type="button" class="btn btn-secondary btn-small" id="ai-view-history-btn">View case history</button>
+          </div>
+        `;
+        relatedHistoryEl.classList.remove("hidden");
+        if (autoCaseCreated) loadCases();
+        relatedHistoryEl.querySelectorAll(".ai-edit-case-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const caseId = parseInt(btn.dataset.caseId, 10);
+            if (!Number.isInteger(caseId)) return;
+            await beginEditCaseWithRefresh(caseId);
+            scrollToCaseHistory();
+          });
+        });
+        relatedHistoryEl.querySelector("#ai-view-history-btn")?.addEventListener("click", () => {
+          scrollToCaseHistory();
+          openCaseFormPanel();
+        });
+      } else {
+        if (data.history_context_used) {
+          relatedHistoryEl.innerHTML = `
+            <p class="history-label">Case history context is enabled</p>
+            ${autoCase
+              ? `<p class="history-label">${autoCaseCreated ? "Auto-added to history:" : "History note detected:"} ${escapeHtml(autoCase.title || "Case")}</p>`
+              : ""}
+            <div class="history-actions">
+              <button type="button" class="btn btn-secondary btn-small" id="ai-view-history-btn">View or edit case history</button>
+            </div>
+          `;
+          relatedHistoryEl.classList.remove("hidden");
+          if (autoCaseCreated) loadCases();
+          relatedHistoryEl.querySelector("#ai-view-history-btn")?.addEventListener("click", () => {
+            scrollToCaseHistory();
+            openCaseFormPanel();
+          });
+        } else if (autoCase) {
+          relatedHistoryEl.innerHTML = `
+            <p class="history-label">${autoCaseCreated ? "Auto-added to history:" : "History note detected:"} ${escapeHtml(autoCase.title || "Case")}</p>
+            <div class="history-actions">
+              <button type="button" class="btn btn-secondary btn-small" id="ai-view-history-btn">View or edit case history</button>
+            </div>
+          `;
+          relatedHistoryEl.classList.remove("hidden");
+          if (autoCaseCreated) loadCases();
+          relatedHistoryEl.querySelector("#ai-view-history-btn")?.addEventListener("click", () => {
+            scrollToCaseHistory();
+            openCaseFormPanel();
+          });
+        } else {
+          relatedHistoryEl.innerHTML = "";
+          relatedHistoryEl.classList.add("hidden");
+        }
+      }
     }
 
     answerEl.classList.remove("hidden");
@@ -1688,8 +1933,130 @@ document.getElementById("add-schedule-form").addEventListener("submit", async (e
 
 // --- Notifications ---
 const NOTIFICATION_POLL_INTERVAL = 30000; // 30 seconds
+const MOCK_NOTIFICATION_EMAILS_KEY = "pillulu_notification_emails_mock";
 let notificationPollTimer = null;
 let countdownInterval = null;
+let mockNotificationEmails = [];
+
+function isValidEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function readMockNotificationEmails() {
+  try {
+    const raw = localStorage.getItem(MOCK_NOTIFICATION_EMAILS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter((item, idx, arr) => item && isValidEmailAddress(item) && arr.indexOf(item) === idx)
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+function writeMockNotificationEmails() {
+  try {
+    localStorage.setItem(MOCK_NOTIFICATION_EMAILS_KEY, JSON.stringify(mockNotificationEmails));
+  } catch {}
+}
+
+function setNotificationEmailHint(message) {
+  const hintEl = document.getElementById("notification-email-hint");
+  if (!hintEl) return;
+  hintEl.textContent = message;
+}
+
+function renderNotificationEmailList() {
+  const listEl = document.getElementById("notification-email-list");
+  if (!listEl) return;
+
+  if (!mockNotificationEmails.length) {
+    listEl.innerHTML = "";
+    setNotificationEmailHint("No reminder email addresses yet.");
+    return;
+  }
+
+  setNotificationEmailHint(`Primary address: ${mockNotificationEmails[0]}`);
+  listEl.innerHTML = mockNotificationEmails
+    .map((email, idx) => `
+      <div class="email-reminder-chip ${idx === 0 ? "primary" : ""}">
+        <span class="email-reminder-chip-label">${escapeHtml(email)}</span>
+        ${idx !== 0 ? `<button type="button" class="email-reminder-chip-btn" data-email-primary="${idx}">Set primary</button>` : ""}
+        <button type="button" class="email-reminder-chip-btn" data-email-remove="${idx}">Remove</button>
+      </div>
+    `)
+    .join("");
+
+  listEl.querySelectorAll("[data-email-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.emailRemove);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= mockNotificationEmails.length) return;
+      mockNotificationEmails.splice(idx, 1);
+      renderNotificationEmailList();
+    });
+  });
+
+  listEl.querySelectorAll("[data-email-primary]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.emailPrimary);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= mockNotificationEmails.length) return;
+      const picked = mockNotificationEmails[idx];
+      mockNotificationEmails.splice(idx, 1);
+      mockNotificationEmails.unshift(picked);
+      renderNotificationEmailList();
+    });
+  });
+}
+
+function addNotificationEmailFromInput() {
+  const inputEl = document.getElementById("notification-email-input");
+  if (!inputEl) return;
+  const value = (inputEl.value || "").trim().toLowerCase();
+  if (!value) {
+    setNotificationEmailHint("Enter an email address first.");
+    return;
+  }
+  if (!isValidEmailAddress(value)) {
+    setNotificationEmailHint("Please enter a valid email format.");
+    return;
+  }
+  if (mockNotificationEmails.includes(value)) {
+    setNotificationEmailHint("This email is already in the reminder list.");
+    return;
+  }
+  if (mockNotificationEmails.length >= 8) {
+    setNotificationEmailHint("You can add up to 8 reminder email addresses in this mock UI.");
+    return;
+  }
+  mockNotificationEmails.push(value);
+  inputEl.value = "";
+  renderNotificationEmailList();
+}
+
+function initNotificationEmailMockUI() {
+  const inputEl = document.getElementById("notification-email-input");
+  const addBtn = document.getElementById("notification-email-add-btn");
+  const saveBtn = document.getElementById("notification-email-save-btn");
+  if (!inputEl || !addBtn || !saveBtn) return;
+
+  mockNotificationEmails = readMockNotificationEmails();
+  renderNotificationEmailList();
+
+  addBtn.addEventListener("click", addNotificationEmailFromInput);
+  inputEl.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      addNotificationEmailFromInput();
+    }
+  });
+  saveBtn.addEventListener("click", () => {
+    writeMockNotificationEmails();
+    setNotificationEmailHint("Saved locally (mock only, not connected to actual email delivery).");
+  });
+}
 
 function formatCountdown(ms) {
   if (ms <= 0) return "Now";
@@ -1821,6 +2188,8 @@ function startNotificationPolling() {
 }
 
 // --- Init ---
+initBodyPanelDrag();
+
 initClearableInput("search-input", "search-input-clear");
 initClearableInput("ai-question", "ai-question-clear");
 initClearableInput("ai-med-context", "ai-med-context-clear");
@@ -1851,3 +2220,4 @@ populateStateSelect();
 loadNotifications();
 startNotificationPolling();
 renderCountdown();
+initNotificationEmailMockUI();

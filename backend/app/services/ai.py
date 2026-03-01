@@ -20,10 +20,31 @@ When discussing medications:
 
 Respond in the same language as the user's question. Be concise and helpful while staying within these boundaries.
 
+You will receive a "Known case history records" list that may be empty. If present, incorporate relevant history context carefully.
+Important: you ARE allowed to read and reference these provided records. Do not claim that you cannot access personal history when records are present in context.
+
 You must respond with valid JSON in this exact format:
-{"answer": "your full answer text here", "suggested_medications": ["med1", "med2", ...]}
+{
+  "answer": "your full answer text here",
+  "suggested_medications": ["med1", "med2"],
+  "related_case_ids": [1,2],
+  "suggested_case_record": {
+    "should_add": true,
+    "title": "Cold symptoms",
+    "diagnosis": "Common cold",
+    "body_part": "chest",
+    "severity": 3,
+    "status": "active",
+    "notes": "User reported cold symptoms in this chat"
+  }
+}
 - "answer": Your complete response including disclaimers
-- "suggested_medications": List of specific medication names (generic or brand) you mentioned, for the user to add to their pillbox. Use 2-6 items. Empty array [] if none apply."""
+- "suggested_medications": List of specific medication names (generic or brand) you mentioned, for the user to add to their pillbox. Use 2-6 items. Empty array [] if none apply.
+- "related_case_ids": IDs of known history records relevant to the answer.
+- "suggested_case_record": Draft history item inferred from the user's message. Set should_add=false when not appropriate.
+Allowed body_part values: "head", "chest", "abdomen", "left_arm", "right_arm", "left_leg", "right_leg".
+If unsure, use should_add=false.
+"""
 
 DISCLAIMER = "This information is for educational purposes only and does not constitute medical advice. Please consult a doctor or pharmacist for personalized guidance."
 
@@ -39,8 +60,8 @@ If unsure, say: "Common use information is not clearly available."
 """
 
 
-def _parse_ai_response(raw: str) -> tuple[str, list[str]]:
-    """Parse AI response. Expects JSON with answer and suggested_medications."""
+def _parse_ai_response(raw: str) -> tuple[str, list[str], list[int], dict]:
+    """Parse AI response. Expects JSON with answer, meds, related_case_ids, suggested_case_record."""
     raw = raw.strip()
     # Try to extract JSON (model might wrap in markdown code block)
     json_match = re.search(r"\{[\s\S]*\}", raw)
@@ -49,15 +70,30 @@ def _parse_ai_response(raw: str) -> tuple[str, list[str]]:
             data = json.loads(json_match.group())
             answer = data.get("answer", raw)
             meds = data.get("suggested_medications", [])
+            related_case_ids = data.get("related_case_ids", [])
+            suggested_case_record = data.get("suggested_case_record", {})
             if isinstance(meds, list):
                 meds = [str(m).strip() for m in meds if m]
-            return answer.strip(), meds
+            if isinstance(related_case_ids, list):
+                related_case_ids = [
+                    int(cid) for cid in related_case_ids
+                    if isinstance(cid, int) or (isinstance(cid, str) and str(cid).isdigit())
+                ]
+            else:
+                related_case_ids = []
+            if not isinstance(suggested_case_record, dict):
+                suggested_case_record = {}
+            return answer.strip(), meds, related_case_ids, suggested_case_record
         except json.JSONDecodeError:
             pass
-    return raw, []
+    return raw, [], [], {}
 
 
-def ask_ai(question: str, context_med_name: str | None = None) -> tuple[str, str, list[str]]:
+def ask_ai(
+    question: str,
+    context_med_name: str | None = None,
+    case_history_context: list[dict] | None = None,
+) -> tuple[str, str, list[str], list[int], dict]:
     """
     Call OpenAI Chat Completions. Returns (answer, disclaimer, suggested_medications).
     Raises Exception on API errors.
@@ -68,6 +104,8 @@ def ask_ai(question: str, context_med_name: str | None = None) -> tuple[str, str
     user_content = question
     if context_med_name:
         user_content = f"Regarding medication: {context_med_name}\n\nUser question: {question}"
+    history_context_text = json.dumps(case_history_context or [], ensure_ascii=False)
+    user_content = f"{user_content}\n\nKnown case history records (may be empty): {history_context_text}"
 
     client = OpenAI(api_key=OPENAI_API_KEY)
     response = client.chat.completions.create(
@@ -79,8 +117,8 @@ def ask_ai(question: str, context_med_name: str | None = None) -> tuple[str, str
         max_tokens=800,
     )
     raw = response.choices[0].message.content or ""
-    answer, suggested_medications = _parse_ai_response(raw)
-    return answer, DISCLAIMER, suggested_medications
+    answer, suggested_medications, related_case_ids, suggested_case_record = _parse_ai_response(raw)
+    return answer, DISCLAIMER, suggested_medications, related_case_ids, suggested_case_record
 
 
 def get_general_use_summary(med_name: str, canonical_name: str | None = None) -> str:

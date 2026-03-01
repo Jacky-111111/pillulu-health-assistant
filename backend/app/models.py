@@ -13,6 +13,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     age = Column(Integer, nullable=True)
+    gender = Column(String(32), nullable=True)
     height_cm = Column(Integer, nullable=True)
     weight_kg = Column(Integer, nullable=True)
     region = Column(String(128), nullable=True)  # city/region within state (legacy: was full region)

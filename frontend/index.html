@@ -35,6 +35,7 @@
         <h2>👤 User Profile</h2>
         <div id="profile-display" class="profile-display">
           <p class="profile-item"><span class="profile-label">Age:</span> <span id="profile-age">—</span></p>
+          <p class="profile-item"><span class="profile-label">Gender:</span> <span id="profile-gender">—</span></p>
           <p class="profile-item"><span class="profile-label">Height:</span> <span id="profile-height">—</span> cm</p>
           <p class="profile-item"><span class="profile-label">Weight:</span> <span id="profile-weight">—</span> kg</p>
           <p class="profile-item"><span class="profile-label">Location:</span> <span id="profile-location">—</span></p>
@@ -63,7 +64,15 @@
       <footer class="page-footer">Jack Yu © 2026.<br>Built with help of Cursor.</footer>
     </aside>
 
-    <aside class="body-panel">
+    <aside class="body-panel" id="body-panel">
+      <div
+        id="body-panel-drag-handle"
+        class="body-panel-drag-handle"
+        title="Drag to move panel left or right"
+      >
+        ↔ Drag panel
+        <span id="body-panel-side-label" class="body-panel-side-label">Docked: left</span>
+      </div>
       <section class="section body-map-section">
         <h2>🧍 Body Insight</h2>
         <p class="section-desc">Past cases are highlighted on body parts.</p>
@@ -107,6 +116,8 @@
         <form id="case-form" class="case-form hidden">
           <label for="case-title">Case title *</label>
           <input type="text" id="case-title" maxlength="255" placeholder="e.g. Migraine flare-up" required>
+          <label for="case-diagnosis">Diagnosis / condition (optional)</label>
+          <input type="text" id="case-diagnosis" maxlength="500" placeholder="e.g. Migraine, gastritis, eczema">
           <label for="case-body-part">Body part *</label>
           <select id="case-body-part" required>
             <option value="">Select body part</option>
@@ -135,7 +146,10 @@
           </div>
           <label for="case-notes">Notes (optional)</label>
           <textarea id="case-notes" rows="2" maxlength="2000" placeholder="Symptoms, diagnosis, treatment response..."></textarea>
-          <button type="submit" class="btn btn-primary">Add case</button>
+          <div class="case-form-actions">
+            <button type="submit" id="case-submit-btn" class="btn btn-primary">Add case</button>
+            <button type="button" id="case-cancel-edit-btn" class="btn btn-secondary hidden">Cancel edit</button>
+          </div>
         </form>
         <div id="case-error" class="error-banner hidden"></div>
         <div id="case-list" class="case-list"></div>
@@ -181,6 +195,7 @@
       <div id="ai-answer" class="ai-answer hidden">
         <div class="answer-content"></div>
         <div id="ai-suggested-meds" class="ai-suggested-meds hidden"></div>
+        <div id="ai-related-history" class="ai-related-history hidden"></div>
         <div class="answer-disclaimer"></div>
       </div>
       <div id="ai-error" class="error-banner hidden"></div>
@@ -209,6 +224,22 @@
       </div>
       <div id="notifications-list" class="notifications-list"></div>
       <div id="notifications-empty" class="empty-state hidden">No notifications yet</div>
+      <div class="email-reminder-section">
+        <h3 class="email-reminder-title">Reminder email addresses</h3>
+        <p class="email-reminder-desc">You can add multiple addresses for reminder notifications.</p>
+        <div class="email-reminder-form-row">
+          <input
+            type="email"
+            id="notification-email-input"
+            placeholder="e.g. me@example.com"
+            aria-label="Add reminder email address"
+          >
+          <button type="button" id="notification-email-add-btn" class="btn btn-primary btn-small">Add</button>
+          <button type="button" id="notification-email-save-btn" class="btn btn-secondary btn-small">Save changes</button>
+        </div>
+        <div id="notification-email-hint" class="email-reminder-hint">No reminder email addresses yet.</div>
+        <div id="notification-email-list" class="email-reminder-list"></div>
+      </div>
     </section>
   </main>
   </div>
@@ -237,6 +268,13 @@
       <form id="profile-form">
         <label for="profile-age">Age</label>
         <input type="number" id="profile-age-input" min="1" max="150" placeholder="e.g. 35">
+        <label for="profile-gender-input">Gender</label>
+        <select id="profile-gender-input">
+          <option value="">Select gender</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="non-binary">Non-binary</option>
+        </select>
         <label for="profile-height-input">Height (cm)</label>
         <input type="number" id="profile-height-input" min="50" max="300" placeholder="e.g. 170">
         <label for="profile-weight-input">Weight (kg)</label>

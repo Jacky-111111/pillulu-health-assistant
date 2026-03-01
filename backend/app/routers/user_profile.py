@@ -15,6 +15,7 @@ def get_profile(user: User = Depends(get_current_user)):
     """Get current user's profile."""
     return UserProfileResponse(
         age=user.age,
+        gender=user.gender,
         height_cm=user.height_cm,
         weight_kg=user.weight_kg,
         region=user.region,
@@ -33,6 +34,7 @@ def update_profile(body: UserProfileUpdate, user: User = Depends(get_current_use
     db.refresh(user)
     return UserProfileResponse(
         age=user.age,
+        gender=user.gender,
         height_cm=user.height_cm,
         weight_kg=user.weight_kg,
         region=user.region,

@@ -49,7 +49,7 @@ def _migrate_auth():
                 conn.commit()
         except Exception:
             pass
-        for col, col_type in [("age", "INTEGER"), ("height_cm", "INTEGER"), ("weight_kg", "INTEGER"), ("region", "VARCHAR(128)"), ("state", "VARCHAR(64)"), ("city", "VARCHAR(128)")]:
+        for col, col_type in [("age", "INTEGER"), ("gender", "VARCHAR(32)"), ("height_cm", "INTEGER"), ("weight_kg", "INTEGER"), ("region", "VARCHAR(128)"), ("state", "VARCHAR(64)"), ("city", "VARCHAR(128)")]:
             try:
                 r = conn.execute(text("PRAGMA table_info(users)"))
                 cols = [row[1] for row in r]
