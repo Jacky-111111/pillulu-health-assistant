@@ -1,6 +1,19 @@
 # Pillulu Health Assistant - Frontend
 
-Vanilla HTML/CSS/JS frontend for medication search, AI Q&A, pillbox, and email settings.
+Vanilla HTML/CSS/JS frontend for medication search, AI Q&A, pillbox management, profile, and notifications.
+
+## Highlights
+
+- Medication search with typeahead suggestions (up to 3)
+- Search result cards with visual metadata (image/imprint/color/shape)
+- Click-to-open medication detail modal, then add directly to pillbox
+- Camera label scan (Tesseract.js OCR) to fill search input
+- AI Q&A section with "add suggested meds" shortcuts
+- Pillbox cards with reminder schedules and visual enrichment indicators
+- Profile modal with age, gender, height, weight, and location
+- Body Insight panel with body-map interactions and case history list
+- AI response cards that can surface related history context
+- Google OAuth entry in login modal
 
 ## Configuration
 
@@ -10,7 +23,7 @@ Edit `app.js` and set `API_BASE` to your backend URL:
 const API_BASE = "https://YOUR-RENDER-URL.onrender.com";
 ```
 
-For local development (backend on port 8000), it auto-detects localhost.
+For local development (backend on port 8000), it auto-detects localhost automatically.
 
 ## Local Development
 
@@ -21,6 +34,12 @@ For local development (backend on port 8000), it auto-detects localhost.
    ```
 2. Open http://localhost:8080
 3. Ensure backend is running at http://127.0.0.1:8000
+
+## UI Notes
+
+- The Google login button style is tuned for high contrast and keyboard focus.
+- Search suggestions are debounced and cached in the browser for faster typing feedback.
+- Medication detail modal is shared between search and pillbox cards for consistent UX.
 
 ## GitHub Pages
 

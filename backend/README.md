@@ -1,6 +1,6 @@
 # Pillulu Health Assistant - Backend
 
-FastAPI backend for medication search, AI Q&A, pillbox management, and in-app notifications.
+FastAPI backend for medication search, AI Q&A, pillbox management, profile/case tracking, and in-app notifications.
 
 ## Quick Start (Local)
 
@@ -43,21 +43,38 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Health check: http://127.0.0.1:8000/health
 
+## What Is Implemented
+
+- Medication search with fuzzy/synonym matching
+- Typeahead medication suggestions (`/api/med/suggest`)
+- Visual metadata enrichment from Rx image/property sources
+- AI fallback for concise "general use" when label use text is missing
+- Pillbox CRUD + schedule CRUD + visual backfill endpoint
+- Email/password auth plus optional OAuth login
+- User profile with age/gender/height/weight/location
+- Weather endpoints (state/city list + current weather/forecast)
+- Body Insight case record endpoints for body-part based tracking and history review
+- AI endpoint that can use stored case history context and return related case references
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/med/search?q=...` | Search medications (OpenFDA) |
-| POST | `/api/ai/ask` | AI Q&A about medication |
+| GET | `/api/med/suggest?q=...` | Typeahead medication suggestions (max 3) |
+| POST | `/api/ai/ask` | AI Q&A about medication, with case-history-aware context when available |
 | GET | `/api/pillbox/meds` | List meds with schedules |
 | POST | `/api/pillbox/meds` | Create med |
 | PUT | `/api/pillbox/meds/{id}` | Update med |
 | DELETE | `/api/pillbox/meds/{id}` | Delete med |
+| POST | `/api/pillbox/enrich-visuals` | Backfill visual fields for existing meds |
 | POST | `/api/pillbox/meds/{id}/schedules` | Add schedule |
 | GET | `/api/pillbox/meds/{id}/schedules` | List schedules |
 | PUT | `/api/schedules/{id}` | Update schedule |
 | DELETE | `/api/schedules/{id}` | Delete schedule |
+| GET | `/api/user/profile` | Get current user profile |
+| PUT | `/api/user/profile` | Update profile (age/gender/height/weight/location) |
 | GET | `/api/user/email` | Get user email (for future email sync) |
 | PUT | `/api/user/email` | Set user email (for future email sync) |
 | GET | `/api/notifications` | List notifications |
@@ -67,6 +84,7 @@ Health check: http://127.0.0.1:8000/health
 | POST | `/api/cron/decrement_stock` | Cron: decrement stock (optional) |
 | GET | `/api/auth/oauth/google/start` | Start Google OAuth login |
 | GET | `/api/auth/oauth/cmu/start` | Start CMU OAuth login |
+| GET/POST/PUT/DELETE | `/api/cases/*` | Body Insight case records CRUD and body-part based history tracking |
 
 ## Environment Variables
 
@@ -85,6 +103,10 @@ Health check: http://127.0.0.1:8000/health
 | GOOGLE_OIDC_DISCOVERY_URL | Optional | Defaults to Google official discovery URL |
 | CMU_CLIENT_ID / CMU_CLIENT_SECRET | Optional | Enable CMU login when both provided |
 | CMU_OIDC_DISCOVERY_URL | Optional | CMU official OIDC discovery URL |
+
+## Migration Notes
+
+The app performs SQLite schema migrations at startup (`init_db()`), including profile and pillbox extension columns introduced by newer features. If you pull updates, restart backend once to apply migrations.
 
 ## Render Deployment (Merged: frontend + backend in one service)
 
