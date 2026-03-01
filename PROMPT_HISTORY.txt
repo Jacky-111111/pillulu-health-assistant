@@ -1,4 +1,4 @@
-I used ChatGPT 5.2 model to generate a well-designed prompt for Cursor to start building.
+I used ChatGPT 5.2 model to generate well-designed prompts for Cursor to conduct the real building.
 Cursor selected its model on its own. I sometimes set the "Cycle Agent Count" to 2x to get better answers.
 
 
@@ -235,3 +235,19 @@ QUALITY BAR
 - Clean JSON responses and clear error messages.
 
 Now generate the full code for backend/ and frontend/ with all files, plus READMEs. Make sure it is copy-paste runnable.
+
+
+--------------------------------------------------------------------------------
+
+
+Other prompts I used (excluding miscellaneous prompts like "fix this bug" and "continue"):
+
+I want to upgrade the Search Med feature by allowing camera scanning to input the name of the medicines.
+
+I would like to implement both CMU login and Google OAuth login. If the user does not have permission to use CMU SSO, the system should automatically fall back to Google login.
+
+After searching for a medicine, I want the results to include an image of the medication retrieved from any public API that supports it, so users can visually spot the med.
+
+When clicking on each medication card, I want a detailed modal popup to appear with more comprehensive drug information (full name, usage, warnings, dosage guidance, etc.), while offering the user with the choice to click “Add to Pillbox” from within that popup.
+
+I want to add a more visually engaging feature: a 2D human body model displayed on the left side of the four main panels. It should support a “medical history” or "past cases" section where previous conditions are recorded and visually highlighted on the corresponding parts of the body model.
