@@ -281,6 +281,7 @@ function updateProfileUI(profile) {
   if (profile) {
     displayEl.classList.remove("hidden");
     promptEl.classList.add("hidden");
+    document.getElementById("profile-name").textContent = renderProfileValue(profile.full_name);
     document.getElementById("profile-age").textContent = renderProfileValue(profile.age);
     document.getElementById("profile-gender").textContent = renderGenderValue(profile.gender);
     document.getElementById("profile-height").textContent = renderProfileValue(profile.height_cm);
@@ -384,7 +385,12 @@ async function loadWeather(state, city) {
 document.getElementById("profile-edit-btn").addEventListener("click", async () => {
   if (!getAuthToken()) return;
   try {
-    const p = await fetchApi("/api/user/profile");
+    const [p, emailResp] = await Promise.all([
+      fetchApi("/api/user/profile"),
+      fetchApi("/api/user/email").catch(() => ({ email: "" })),
+    ]);
+    document.getElementById("profile-full-name-input").value = p.full_name ?? "";
+    document.getElementById("profile-email-input").value = emailResp?.email || "";
     document.getElementById("profile-age-input").value = p.age ?? "";
     document.getElementById("profile-gender-input").value = p.gender ?? "";
     document.getElementById("profile-height-input").value = p.height_cm ?? "";
@@ -404,24 +410,44 @@ document.getElementById("profile-cancel").addEventListener("click", () => {
 
 document.getElementById("profile-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const reminderEmail = document.getElementById("profile-email-input").value.trim().toLowerCase();
+  const full_name = document.getElementById("profile-full-name-input").value.trim() || null;
   const age = document.getElementById("profile-age-input").value;
   const gender = document.getElementById("profile-gender-input").value || null;
   const height_cm = document.getElementById("profile-height-input").value;
   const weight_kg = document.getElementById("profile-weight-input").value;
   const state = document.getElementById("profile-state-input").value || null;
   const city = document.getElementById("profile-city-input").value || null;
+
+  if (reminderEmail && !isValidEmailAddress(reminderEmail)) {
+    alert("Please enter a valid reminder email.");
+    return;
+  }
+
   try {
-    await fetchApi("/api/user/profile", {
-      method: "PUT",
-      body: JSON.stringify({
-        age: age ? parseInt(age, 10) : null,
-        gender,
-        height_cm: height_cm ? parseInt(height_cm, 10) : null,
-        weight_kg: weight_kg ? parseInt(weight_kg, 10) : null,
-        state,
-        city,
+    const tasks = [
+      fetchApi("/api/user/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          age: age ? parseInt(age, 10) : null,
+          full_name,
+          gender,
+          height_cm: height_cm ? parseInt(height_cm, 10) : null,
+          weight_kg: weight_kg ? parseInt(weight_kg, 10) : null,
+          state,
+          city,
+        }),
       }),
-    });
+    ];
+    if (reminderEmail) {
+      tasks.push(
+        fetchApi("/api/user/email", {
+          method: "PUT",
+          body: JSON.stringify({ email: reminderEmail }),
+        })
+      );
+    }
+    await Promise.all(tasks);
     document.getElementById("profile-modal").classList.add("hidden");
     loadProfile();
     loadWeather(state, city);
@@ -588,7 +614,7 @@ async function exportMedicalRecordPdf() {
 
     writeSectionTitle("Patient Information");
     writeLabelLine("Email", me?.email);
-    writeLabelLine("Name", "N/A");
+    writeLabelLine("Name", profile?.full_name);
     writeLabelLine("Age", profile?.age);
     writeLabelLine("Weight (kg)", profile?.weight_kg);
     writeLabelLine("Height (cm)", profile?.height_cm);

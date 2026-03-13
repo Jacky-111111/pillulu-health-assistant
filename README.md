@@ -15,6 +15,7 @@ A web app to help users search medications, ask AI health questions, manage a pe
 - **🫀 Body Insight & Case History** - Body-part based case records and history tracking for ongoing symptoms/conditions
 - **🤖 Ask AI** - Ask educational medication questions with optional case-history context awareness (OpenAI; not medical advice)
 - **🔔 Notifications** - In-app reminders for time-to-take and low stock
+- **📧 Reminder Email Delivery** - Reminder emails are sent by **Resend** when cron runs
 - **👤 User Profile** - Age, gender, height, weight, and location (state/city)
 - **🌤️ Local Weather** - Weather widget based on profile location (Open-Meteo)
 - **🔐 Auth** - Email/password auth plus Google OAuth login
@@ -43,7 +44,12 @@ source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create `.env` in `backend/` with `OPENAI_API_KEY`, `CRON_SECRET`, etc. (see `backend/.env.example`).
+Create `.env` in `backend/` with `OPENAI_API_KEY`, `CRON_SECRET`, and email settings for Resend (see `backend/.env.example`).
+
+Key email-related vars:
+
+- `RESEND_API_KEY` - Resend API key
+- `FROM_EMAIL` - Verified sender in Resend
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -64,6 +70,7 @@ Open [http://localhost:8080](http://localhost:8080). The frontend uses `API_BASE
 
 - If you update DB-backed profile/pillbox fields, restart backend once to allow SQLite auto-migrations to run.
 - Camera scan requires browser camera permission and works best on HTTPS or localhost.
+- The Notifications section includes a multi-email editor UI in the frontend. It is currently a **mock/local-only** UI and is not yet wired to backend delivery logic.
 
 ## Deployment
 
@@ -74,4 +81,4 @@ See `backend/README.md` and `frontend/README.md` for details.
 
 ## Secrets
 
-Never commit: `OPENAI_API_KEY`, `CRON_SECRET`, `.env`
+Never commit: `OPENAI_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET`, `.env`

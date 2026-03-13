@@ -34,6 +34,7 @@
       <section class="section profile-section">
         <h2>👤 User Profile</h2>
         <div id="profile-display" class="profile-display">
+          <p class="profile-item"><span class="profile-label">Name:</span> <span id="profile-name">—</span></p>
           <p class="profile-item"><span class="profile-label">Age:</span> <span id="profile-age">—</span></p>
           <p class="profile-item"><span class="profile-label">Gender:</span> <span id="profile-gender">—</span></p>
           <p class="profile-item"><span class="profile-label">Height:</span> <span id="profile-height">—</span> cm</p>
@@ -271,6 +272,10 @@
     <div class="modal-content">
       <h3>Edit Profile</h3>
       <form id="profile-form">
+        <label for="profile-full-name-input">Name</label>
+        <input type="text" id="profile-full-name-input" maxlength="128" placeholder="e.g. Andrew Carnegie">
+        <label for="profile-email-input">Reminder email</label>
+        <input type="email" id="profile-email-input" placeholder="e.g. your@email.com">
         <label for="profile-age">Age</label>
         <input type="number" id="profile-age-input" min="1" max="150" placeholder="e.g. 35">
         <label for="profile-gender-input">Gender</label>

@@ -21,25 +21,21 @@ router = APIRouter(prefix="/api", tags=["pillbox"])
 
 # --- User / Email (for reminder notifications, requires auth) ---
 @router.get("/user/email")
-def get_user_email(db: Session = Depends(get_db)):
-    """Get stored user email. Returns first auth user's email (legacy)."""
-    user = db.query(User).filter(User.password_hash.isnot(None)).first()
-    return {"email": user.email if user else ""}
+def get_user_email(user: User = Depends(get_current_user)):
+    """Get current user's reminder email (falls back to login email)."""
+    return {"email": (user.reminder_email or user.email or "").strip()}
 
 
 @router.put("/user/email")
-def set_user_email(body: UserEmailUpdate, db: Session = Depends(get_db)):
-    """Set user email for reminders. Creates/updates first auth user (legacy)."""
-    from app.services.auth import hash_password
-    user = db.query(User).filter(User.password_hash.isnot(None)).first()
-    if user:
-        user.email = body.email
-    else:
-        user = User(email=body.email, password_hash=hash_password("changeme"))
-        db.add(user)
+def set_user_email(body: UserEmailUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Set current user's reminder recipient email (separate from login email)."""
+    email = (body.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    user.reminder_email = email
     db.commit()
     db.refresh(user)
-    return {"email": user.email}
+    return {"email": user.reminder_email}
 
 
 # --- Meds CRUD ---

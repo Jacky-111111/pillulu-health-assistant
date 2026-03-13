@@ -14,6 +14,7 @@ Vanilla HTML/CSS/JS frontend for medication search, AI Q&A, pillbox management, 
 - Body Insight panel with body-map interactions and case history list
 - AI response cards that can surface related history context
 - Google OAuth entry in login modal
+- Notifications includes a multi-email reminder editor UI (mock/local only for now)
 
 ## Configuration
 
@@ -40,6 +41,7 @@ For local development (backend on port 8000), it auto-detects localhost automati
 - The Google login button style is tuned for high contrast and keyboard focus.
 - Search suggestions are debounced and cached in the browser for faster typing feedback.
 - Medication detail modal is shared between search and pillbox cards for consistent UX.
+- Reminder email list in Notifications is currently stored in browser localStorage only (no backend sync yet).
 
 ## GitHub Pages
 

@@ -2,6 +2,8 @@
 
 FastAPI backend for medication search, AI Q&A, pillbox management, profile/case tracking, and in-app notifications.
 
+Reminder emails are delivered via **Resend** when cron triggers `send_reminders`.
+
 ## Quick Start (Local)
 
 ```bash
@@ -15,7 +17,7 @@ Create `.env` in `backend/` (or set env vars). Keys are loaded in order: env var
 
 ```
 OPENAI_API_KEY=sk-...
-SENDGRID_API_KEY=SG....
+RESEND_API_KEY=re_...
 FROM_EMAIL=your-verified-sender@domain.com
 APP_BASE_URL=https://your-username.github.io/pillulu-health-assistant/
 DATABASE_PATH=./data/pillulu.db
@@ -75,12 +77,12 @@ Health check: http://127.0.0.1:8000/health
 | DELETE | `/api/schedules/{id}` | Delete schedule |
 | GET | `/api/user/profile` | Get current user profile |
 | PUT | `/api/user/profile` | Update profile (age/gender/height/weight/location) |
-| GET | `/api/user/email` | Get user email (for future email sync) |
-| PUT | `/api/user/email` | Set user email (for future email sync) |
+| GET | `/api/user/email` | Get user email for reminder emails |
+| PUT | `/api/user/email` | Set user email for reminder emails |
 | GET | `/api/notifications` | List notifications |
 | PUT | `/api/notifications/{id}/read` | Mark notification read |
 | PUT | `/api/notifications/read-all` | Mark all read |
-| POST | `/api/cron/send_reminders` | Cron: create notifications (requires CRON_SECRET) |
+| POST | `/api/cron/send_reminders` | Cron: create notifications and send reminder emails (requires CRON_SECRET) |
 | POST | `/api/cron/decrement_stock` | Cron: decrement stock (optional) |
 | GET | `/api/auth/oauth/google/start` | Start Google OAuth login |
 | GET | `/api/auth/oauth/cmu/start` | Start CMU OAuth login |
@@ -91,8 +93,8 @@ Health check: http://127.0.0.1:8000/health
 | Variable | Required | Description |
 |----------|----------|-------------|
 | OPENAI_API_KEY | For AI | OpenAI API key |
-| SENDGRID_API_KEY | Optional | For future email sync |
-| FROM_EMAIL | Optional | For future email sync |
+| RESEND_API_KEY | Optional | API key used to send reminder emails via Resend |
+| FROM_EMAIL | Optional | Verified sender email in Resend |
 | APP_BASE_URL | Optional | Frontend URL |
 | DATABASE_PATH | Optional | Default: ./data/pillulu.db |
 | CRON_SECRET | For cron | Secret for cron endpoints |
@@ -143,6 +145,8 @@ Or send JSON body: `{"secret": "your-cron-secret"}`
 3. **Time must match exactly**: Schedule time (e.g. 08:30) must equal the current minute in the schedule's timezone when cron runs. Cron must run every minute.
 
 4. **Deployed on Render**: Ensure a Cron Job is configured and runs every minute (`* * * * *`).
+
+5. **Resend not configured**: reminder emails require both `RESEND_API_KEY` and a verified `FROM_EMAIL`. If either is missing/invalid, in-app notifications may still be created but email delivery will fail.
 
 ## Secrets
 

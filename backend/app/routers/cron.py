@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import Med, Schedule
 from app.config import CRON_SECRET
 from app.services.notification import create_time_to_take_notification, create_low_stock_notification
+from app.services.email import send_time_to_take_reminder, send_low_stock_reminder
 
 router = APIRouter(prefix="/api/cron", tags=["cron"])
 
@@ -103,6 +104,7 @@ async def send_reminders(
 
     today_date = date.today()
     sent_count = 0
+    email_sent_count = 0
 
     # Time-to-take reminders (evaluate each schedule in its timezone)
     schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
@@ -119,6 +121,13 @@ async def send_reminders(
             continue
 
         create_time_to_take_notification(db, s.med.name, s.time_of_day)
+        user_email = (
+            ((s.med.user.reminder_email or s.med.user.email) if s.med and s.med.user else "")
+            .strip()
+            .lower()
+        )
+        if user_email and send_time_to_take_reminder(user_email, s.med.name, s.time_of_day):
+            email_sent_count += 1
         s.last_reminder_sent_at = now_tz
         sent_count += 1
         # Decrement stock on reminder (MVP assumption)
@@ -133,12 +142,25 @@ async def send_reminders(
         if med.last_low_stock_sent_at == today_date:
             continue
         create_low_stock_notification(db, med.name, med.stock_count, med.low_stock_threshold)
+        user_email = (
+            ((med.user.reminder_email or med.user.email) if med.user else "")
+            .strip()
+            .lower()
+        )
+        if user_email and send_low_stock_reminder(
+            user_email, med.name, med.stock_count, med.low_stock_threshold
+        ):
+            email_sent_count += 1
         med.last_low_stock_sent_at = today_date
         sent_count += 1
 
     db.commit()
 
-    return {"sent": sent_count, "message": "Reminders processed"}
+    return {
+        "sent": sent_count,
+        "email_sent": email_sent_count,
+        "message": "Reminders processed",
+    }
 
 
 @router.post("/decrement_stock")

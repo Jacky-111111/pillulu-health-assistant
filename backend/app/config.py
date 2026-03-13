@@ -32,7 +32,7 @@ DB_DIR = str(Path(DATABASE_PATH).parent)
 
 # API Keys - works with .env, Render env vars, or secrets.txt
 OPENAI_API_KEY = _get_secret("OPENAI_API_KEY")
-SENDGRID_API_KEY = _get_secret("SENDGRID_API_KEY")
+RESEND_API_KEY = _get_secret("RESEND_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "https://your-username.github.io/pillulu-health-assistant/")
 CRON_SECRET = _get_secret("CRON_SECRET")

@@ -122,13 +122,14 @@ class ScheduleUpdate(BaseModel):
     enabled: Optional[bool] = None
 
 
-# --- User / Email Settings (for future email sync) ---
+# --- User / Email Settings (for reminder emails) ---
 class UserEmailUpdate(BaseModel):
     email: str = Field(..., min_length=1, max_length=255)
 
 
 # --- User Profile ---
 class UserProfileResponse(BaseModel):
+    full_name: Optional[str] = None
     age: Optional[int] = None
     gender: Optional[str] = None
     height_cm: Optional[int] = None
@@ -139,6 +140,7 @@ class UserProfileResponse(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, max_length=128)
     age: Optional[int] = Field(None, ge=1, le=150)
     gender: Optional[str] = Field(None, pattern=r"^(male|female|non-binary)$")
     height_cm: Optional[int] = Field(None, ge=50, le=300)

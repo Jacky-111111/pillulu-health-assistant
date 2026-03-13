@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/user", tags=["user-profile"])
 def get_profile(user: User = Depends(get_current_user)):
     """Get current user's profile."""
     return UserProfileResponse(
+        full_name=user.full_name,
         age=user.age,
         gender=user.gender,
         height_cm=user.height_cm,
@@ -33,6 +34,7 @@ def update_profile(body: UserProfileUpdate, user: User = Depends(get_current_use
     db.commit()
     db.refresh(user)
     return UserProfileResponse(
+        full_name=user.full_name,
         age=user.age,
         gender=user.gender,
         height_cm=user.height_cm,
