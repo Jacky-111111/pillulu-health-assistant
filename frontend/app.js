@@ -453,6 +453,218 @@ function formatCaseDate(dateStr) {
   return dateStr || "N/A";
 }
 
+function toExportValue(value) {
+  if (value == null) return "N/A";
+  const text = String(value).trim();
+  return text ? text : "N/A";
+}
+
+function formatDaysOfWeek(daysOfWeek) {
+  const raw = String(daysOfWeek || "").trim();
+  if (!raw) return "N/A";
+  if (raw.toLowerCase() === "daily") return "Daily";
+  return raw
+    .split(",")
+    .map((day) => day.trim())
+    .filter(Boolean)
+    .map((day) => day[0].toUpperCase() + day.slice(1).toLowerCase())
+    .join(", ");
+}
+
+function sortCasesForExport(cases) {
+  return (cases || []).slice().sort((a, b) => {
+    const left = a?.occurred_on || a?.created_at || "";
+    const right = b?.occurred_on || b?.created_at || "";
+    if (left === right) return 0;
+    return left > right ? 1 : -1;
+  });
+}
+
+async function exportMedicalRecordPdf() {
+  if (!getAuthToken()) {
+    alert("Please log in first.");
+    return;
+  }
+
+  const previewTab = window.open("about:blank", "_blank");
+  if (!previewTab) {
+    alert("Please allow pop-ups to preview the PDF.");
+    return;
+  }
+  previewTab.document.title = "Preparing Medical Record PDF...";
+  previewTab.document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 16px;'>Preparing PDF preview...</p>";
+
+  const exportBtn = document.getElementById("export-medical-record-btn");
+  const defaultLabel = exportBtn?.dataset?.defaultLabel || "Export Medical Record";
+  if (exportBtn) {
+    exportBtn.dataset.defaultLabel = defaultLabel;
+    exportBtn.disabled = true;
+    exportBtn.textContent = "Preparing preview...";
+  }
+
+  try {
+    const jsPdfCtor = window.jspdf?.jsPDF;
+    if (!jsPdfCtor) {
+      throw new Error("PDF library failed to load. Please refresh and try again.");
+    }
+
+    const [me, profile, cases, meds] = await Promise.all([
+      fetchApi("/api/auth/me"),
+      fetchApi("/api/user/profile"),
+      fetchApi("/api/cases"),
+      fetchApi("/api/pillbox/meds"),
+    ]);
+
+    const doc = new jsPdfCtor({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 42;
+    const contentWidth = pageWidth - margin * 2;
+    const colors = {
+      primary: [27, 73, 101],
+      secondary: [98, 182, 203],
+      text: [32, 49, 65],
+      muted: [82, 109, 130],
+      panel: [240, 249, 255],
+    };
+
+    let y = margin;
+    const ensureSpace = (needed = 20) => {
+      if (y + needed <= pageHeight - margin) return;
+      doc.addPage();
+      y = margin;
+    };
+    const writeWrappedLine = (text, options = {}) => {
+      const {
+        size = 11,
+        color = colors.text,
+        bold = false,
+        indent = 0,
+        lineHeight = 14,
+      } = options;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      const lines = doc.splitTextToSize(String(text || ""), contentWidth - indent);
+      ensureSpace(lines.length * lineHeight + 2);
+      doc.text(lines, margin + indent, y);
+      y += lines.length * lineHeight;
+    };
+    const writeSectionTitle = (title) => {
+      ensureSpace(36);
+      doc.setFillColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+      doc.roundedRect(margin, y, contentWidth, 24, 5, 5, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text(String(title), margin + 10, y + 16);
+      y += 34;
+    };
+    const writeSeparator = () => {
+      ensureSpace(10);
+      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+      doc.setLineWidth(0.8);
+      doc.line(margin, y, margin + contentWidth, y);
+      y += 10;
+    };
+    const writeLabelLine = (label, value) => {
+      writeWrappedLine(`${label}: ${toExportValue(value)}`, {
+        size: 11,
+        color: colors.text,
+        lineHeight: 14,
+      });
+    };
+
+    doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.roundedRect(margin, y, contentWidth, 58, 8, 8, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Medical Record Export", margin + 14, y + 25);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin + 14, y + 44);
+    y += 74;
+
+    writeSectionTitle("Patient Information");
+    writeLabelLine("Email", me?.email);
+    writeLabelLine("Name", "N/A");
+    writeLabelLine("Age", profile?.age);
+    writeLabelLine("Weight (kg)", profile?.weight_kg);
+    writeLabelLine("Height (cm)", profile?.height_cm);
+    writeLabelLine("Gender", profile?.gender);
+    writeLabelLine("Location", [profile?.city, profile?.state].filter(Boolean).join(", ") || profile?.region);
+    y += 4;
+    writeSeparator();
+
+    writeSectionTitle("Case History");
+    const sortedCases = sortCasesForExport(cases);
+    if (!sortedCases.length) {
+      writeWrappedLine("No records", { color: colors.muted, size: 11 });
+      y += 4;
+    } else {
+      sortedCases.forEach((item, idx) => {
+        writeWrappedLine(`${idx + 1}. ${toExportValue(item?.title || "Untitled case")}`, {
+          bold: true,
+          color: colors.primary,
+          size: 11,
+          lineHeight: 13,
+        });
+        writeWrappedLine(
+          `Diagnosis: ${toExportValue(item?.diagnosis)} | Status: ${toExportValue(item?.status)} | Severity: ${toExportValue(item?.severity)}`,
+          { size: 10, lineHeight: 12 }
+        );
+        writeWrappedLine(`Body part: ${toExportValue(getBodyPartLabel(item?.body_part))}`, { size: 10, lineHeight: 12 });
+        writeWrappedLine(`Date: ${toExportValue(item?.occurred_on || item?.created_at)}`, { size: 10, lineHeight: 12 });
+        writeWrappedLine(`Notes: ${toExportValue(item?.notes)}`, { size: 10, lineHeight: 12, color: colors.muted });
+        y += 4;
+        writeSeparator();
+      });
+    }
+
+    writeSectionTitle("Current Medications");
+    if (!(meds || []).length) {
+      writeWrappedLine("No records", { color: colors.muted, size: 11 });
+    } else {
+      (meds || []).forEach((med, idx) => {
+        const schedules = (med?.schedules || []).map((sched) => {
+          const time = toExportValue(sched?.time_of_day);
+          const days = formatDaysOfWeek(sched?.days_of_week);
+          return `${time} (${days})`;
+        });
+        writeWrappedLine(`${idx + 1}. ${toExportValue(med?.name)}`, {
+          bold: true,
+          color: colors.primary,
+          size: 11,
+          lineHeight: 13,
+        });
+        writeWrappedLine(`Purpose: ${toExportValue(med?.purpose)}`, { size: 10, lineHeight: 12 });
+        writeWrappedLine(`Frequency: ${schedules.length ? schedules.join(" | ") : "None"}`, {
+          size: 10,
+          lineHeight: 12,
+          color: colors.muted,
+        });
+        y += 4;
+        writeSeparator();
+      });
+    }
+
+    const blob = doc.output("blob");
+    const blobUrl = URL.createObjectURL(blob);
+    previewTab.location.href = blobUrl;
+    previewTab.focus();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5 * 60 * 1000);
+  } catch (err) {
+    previewTab.close();
+    alert(err?.message || "Failed to export PDF.");
+  } finally {
+    if (exportBtn) {
+      exportBtn.disabled = false;
+      exportBtn.textContent = exportBtn.dataset.defaultLabel || "Export Medical Record";
+    }
+  }
+}
+
 const BODY_PANEL_SIDE_KEY = "pillulu_body_panel_side";
 
 function applyBodyPanelSide(side) {
@@ -2193,6 +2405,7 @@ initBodyPanelDrag();
 initClearableInput("search-input", "search-input-clear");
 initClearableInput("ai-question", "ai-question-clear");
 initClearableInput("ai-med-context", "ai-med-context-clear");
+document.getElementById("export-medical-record-btn")?.addEventListener("click", exportMedicalRecordPdf);
 
 populateStateSelect();
 

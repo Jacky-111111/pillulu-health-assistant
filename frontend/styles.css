@@ -708,6 +708,28 @@ body {
   color: var(--secondary);
 }
 
+.export-record-section {
+  padding: 0;
+  min-height: auto;
+  margin-top: 1rem;
+}
+
+.btn-export-record {
+  width: 100%;
+  margin-top: 0.2rem;
+  box-shadow: 0 2px 6px rgba(27, 73, 101, 0.2);
+}
+
+.btn-export-record:hover {
+  box-shadow: 0 4px 10px rgba(27, 73, 101, 0.24);
+}
+
+.btn-export-record:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* Main - dashboard grid */
 .main {
   flex: 1;

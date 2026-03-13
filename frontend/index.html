@@ -61,6 +61,11 @@
         </div>
         <p class="weather-attribution">Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
       </section>
+      <section class="section export-record-section" id="export-record-section">
+        <h2>📄 Export Medical Record</h2>
+        <p class="section-desc">Download your profile, case history, and pillbox schedule as a themed PDF.</p>
+        <button type="button" id="export-medical-record-btn" class="btn btn-primary btn-export-record">Export Medical Record</button>
+      </section>
       <footer class="page-footer">Jack Yu © 2026.<br>Built with help of Cursor.</footer>
     </aside>
 
@@ -447,6 +452,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
