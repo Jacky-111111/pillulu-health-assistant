@@ -506,6 +506,36 @@ function sortCasesForExport(cases) {
   });
 }
 
+function sanitizeFileNamePart(value, fallback = "patient") {
+  const source = String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  const cleaned = source
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+  return cleaned || fallback;
+}
+
+function formatExportTimestamp(now = new Date()) {
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mi = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
+}
+
+function buildMedicalRecordFileName(me, profile) {
+  const preferredIdentity = profile?.full_name || me?.email?.split("@")[0] || "patient";
+  const identityPart = sanitizeFileNamePart(preferredIdentity, "patient");
+  const timestampPart = formatExportTimestamp();
+  return `medical-record_${identityPart}_${timestampPart}.pdf`;
+}
+
 async function exportMedicalRecordPdf() {
   if (!getAuthToken()) {
     alert("Please log in first.");
@@ -540,6 +570,7 @@ async function exportMedicalRecordPdf() {
       fetchApi("/api/cases"),
       fetchApi("/api/pillbox/meds"),
     ]);
+    const exportFileName = buildMedicalRecordFileName(me, profile);
 
     const doc = new jsPdfCtor({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -677,7 +708,17 @@ async function exportMedicalRecordPdf() {
 
     const blob = doc.output("blob");
     const blobUrl = URL.createObjectURL(blob);
-    previewTab.location.href = blobUrl;
+    const escapedFileName = escapeHtml(exportFileName);
+    previewTab.document.title = exportFileName;
+    previewTab.document.body.innerHTML = `
+      <div style="font-family: Arial, sans-serif; padding: 12px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #d6e6ef;">
+        <a href="${blobUrl}" download="${escapedFileName}" style="text-decoration: none; background: #1b4965; color: #fff; padding: 8px 12px; border-radius: 6px; font-weight: 600;">
+          Download PDF
+        </a>
+        <span style="color: #4f6477; font-size: 13px;">Filename: ${escapedFileName}</span>
+      </div>
+      <iframe title="Medical Record PDF Preview" src="${blobUrl}" style="width: 100%; height: calc(100vh - 56px); border: 0;"></iframe>
+    `;
     previewTab.focus();
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5 * 60 * 1000);
   } catch (err) {
